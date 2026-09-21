@@ -1,0 +1,41 @@
+{
+  "name": "real-estate-manager",
+  "version": "1.0.0",
+  "description": "برنامج إدارة العقارات والعملاء",
+  "main": "main.js",
+  "author": "Ibrahim",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --publish never"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.ibrahim.realestatemanager",
+    "productName": "RealEstateManager",
+    "files": [
+      "main.js",
+      "storage.js",
+      "preload.js",
+      "index.html",
+      "renderer.js",
+      "export.js",
+      "style.css"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}
