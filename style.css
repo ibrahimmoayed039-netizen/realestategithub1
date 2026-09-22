@@ -419,3 +419,52 @@ h2 { margin: 0 0 18px; font-size: 20px; }
 
 /* ---------- عرض تدريجي للقائمة ---------- */
 .more { text-align: center; padding: 14px 0 24px; }
+
+/* سحب وإفلات الصور إلى واتساب */
+.gallery.small .g-item.pick { cursor: grab; }
+.g-item.pick.sel { border-color: var(--petrol); box-shadow: 0 0 0 2px var(--petrol); }
+.pk-check {
+  position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 50%;
+  background: rgba(255,255,255,.9); border: 1px solid var(--line); color: transparent;
+  font-size: 13px; line-height: 18px; text-align: center;
+}
+.g-item.pick.sel .pk-check { background: var(--petrol); border-color: var(--petrol); color: #fff; }
+.pk-copy {
+  position: absolute; bottom: 4px; left: 4px; width: 22px; height: 22px; border: 0; border-radius: 50%;
+  background: rgba(0,0,0,.6); color: #fff; cursor: pointer; line-height: 1; font-size: 13px;
+}
+.wa-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 6px 0; }
+.wa-drag {
+  margin-top: 10px; padding: 12px; border: 2px dashed var(--petrol); border-radius: 8px;
+  background: #f0f7f8; color: var(--petrol); font-weight: 600; text-align: center;
+  cursor: grab; user-select: none;
+}
+.wa-drag:active { cursor: grabbing; }
+
+/* التفعيل */
+.lic-badge {
+  margin-inline-start: auto; border: 0; border-radius: 999px; padding: 6px 14px; white-space: nowrap;
+  font: inherit; font-size: 12.5px; font-weight: 600; color: #fff; cursor: pointer;
+  background: rgba(255,255,255,.16); box-shadow: inset 0 1px 0 rgba(255,255,255,.2);
+}
+.lic-badge.ok { background: #2f8f5b; }
+.lic-badge.trial { background: var(--brass); }
+.lic-badge.locked { background: var(--danger); }
+.mono { font-family: Consolas, "Courier New", monospace; letter-spacing: 1px; font-size: 16px; }
+.lic-state { border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; font-weight: 600; background: #f3f6f7; border: 1px solid var(--line); }
+.lic-state.ok { background: #eaf6ef; border-color: #b9dfc9; color: #1f6b41; }
+.lic-state.trial { background: #fbf4e4; border-color: #ecd9a8; color: #7a5a17; }
+.lic-state.locked { background: #fbeceb; border-color: #efc4c0; color: var(--danger); }
+.lic-msg { color: var(--danger); font-weight: 600; margin: 8px 0 0; }
+.activate #licKey { font-family: Consolas, "Courier New", monospace; font-size: 13px; }
+.top { gap: 18px; }
+.tab { padding: 0 13px; white-space: nowrap; }
+.brand span { white-space: nowrap; }
+.lic-badge { font-size: 12px; padding: 5px 11px; }
+.actions + .hint { margin-top: 14px; }
+@media (max-width: 1150px) {
+  .top { gap: 10px; padding: 0 12px; }
+  .tab { padding: 0 9px; font-size: 14px; }
+  .brand { font-size: 16px; gap: 8px; }
+  .lic-badge { font-size: 11px; padding: 4px 9px; }
+}

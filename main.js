@@ -2,7 +2,9 @@ const { app, BrowserWindow, ipcMain, shell, clipboard, nativeImage, dialog, Menu
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const os = require('os');
 const { createStore } = require('./storage');
+const { createManager, systemMachineId } = require('./license');
 
 let win;
 
@@ -45,13 +47,43 @@ app.on('window-all-closed', () => {
 // ---------- التخزين ----------
 let _store;
 const store = () => (_store = _store || createStore(app.getPath('userData')));
+let knownCount = 0; // عدد العقارات المحفوظ حالياً (لمنع تجاوز حد النسخة التجريبية)
 ipcMain.handle('db:load', async () => {
   try {
-    return await store().load();
+    const data = await store().load();
+    knownCount = data && Array.isArray(data.records) ? data.records.length : 0;
+    return data;
   } catch (e) {
     return null;
   }
 });
+
+// ---------- التفعيل ----------
+// نسخ متعددة لبيانات الفترة التجريبية في أماكن مختلفة، فلا تُعاد الفترة بمجرد حذف مجلد البيانات
+let _lic;
+const lic = () =>
+  (_lic =
+    _lic ||
+    createManager({
+      files: [
+        path.join(app.getPath('userData'), 'license.dat'),
+        path.join(app.getPath('appData'), '.rem-cache.dat'),
+        path.join(os.homedir(), '.rem-cache.dat')
+      ],
+      machineId: systemMachineId()
+    }));
+ipcMain.handle('license:status', () => lic().status());
+ipcMain.handle('license:activate', (_e, key) => lic().activate(String(key || '')));
+
+// يُرجع كائن رفض إن لم يُسمح بالحفظ (البرنامج مقفل، أو تجاوز حدّ النسخة التجريبية)
+function checkSave(recordCount) {
+  const st = lic().status();
+  if (st.state === 'expired') return { ok: false, locked: true, reason: st.reason };
+  if (st.state === 'trial' && recordCount > st.maxRecords && recordCount > knownCount) {
+    return { ok: false, limit: true, max: st.maxRecords };
+  }
+  return null;
+}
 
 // ---------- النسخ الاحتياطي التلقائي (بعد كل عملية حفظ) ----------
 const cfgFile = () => path.join(app.getPath('userData'), 'config.json');
@@ -123,18 +155,24 @@ app.on('before-quit', (e) => {
 
 // حفظ جزئي: بيانات العقارات الخفيفة + صور العقارات التي تغيّرت فقط
 ipcMain.handle('db:savePart', async (_e, payload) => {
+  const denied = checkSave((payload.records || []).length);
+  if (denied) return denied;
   await store().save(payload);
+  knownCount = (payload.records || []).length;
   scheduleBackup(!!payload.forceBackup);
   return { ok: true, backupError: lastBackupError };
 });
 
 // حفظ كامل (احتياطي للتوافق)
 ipcMain.handle('db:save', async (_e, data) => {
+  const denied = checkSave((data.records || []).length);
+  if (denied) return denied;
   const photos = {};
   (data.records || []).forEach((r) => {
     photos[r.id] = Array.isArray(r.photos) && r.photos.length ? r.photos : r.photo ? [r.photo] : [];
   });
   await store().save({ records: data.records || [], areas: data.areas, settings: data.settings, photos });
+  knownCount = (data.records || []).length;
   scheduleBackup(false);
   return { ok: true, backupError: lastBackupError };
 });
@@ -193,6 +231,78 @@ ipcMain.handle('clipboard:image', (_e, dataUrl) => {
   if (img.isEmpty()) return false;
   clipboard.writeImage(img);
   return true;
+});
+
+// ---------- سحب وإفلات الصور إلى واتساب ----------
+// تُكتب صور العقار كملفات مؤقتة (photo-01.jpg ...) ثم تُسحب من نافذة البرنامج كملفات حقيقية إلى المحادثة.
+const shareRoot = () => path.join(app.getPath('temp'), 'RealEstateManager-share');
+let dragFiles = [];
+let dragIcon = null;
+let prepToken = 0;
+
+function cleanShare(all) {
+  try {
+    const root = shareRoot();
+    if (!fs.existsSync(root)) return;
+    if (all) return fs.rmSync(root, { recursive: true, force: true });
+    for (const d of fs.readdirSync(root)) {
+      const p = path.join(root, d);
+      if (Date.now() - fs.statSync(p).mtimeMs > 60 * 60 * 1000) fs.rmSync(p, { recursive: true, force: true });
+    }
+  } catch (e) {}
+}
+app.on('will-quit', () => cleanShare(true));
+
+ipcMain.handle('share:prepare', async (_e, photos) => {
+  const token = ++prepToken;
+  dragFiles = [];
+  dragIcon = null;
+  if (!Array.isArray(photos) || !photos.length) return 0;
+  try {
+    cleanShare(false);
+    const dir = path.join(shareRoot(), String(Date.now()));
+    await fs.promises.mkdir(dir, { recursive: true });
+    const out = [];
+    for (let i = 0; i < photos.length; i++) {
+      const src = String(photos[i] || '');
+      const m = /^data:image\/(jpeg|jpg|png);base64,(.+)$/i.exec(src);
+      let buf;
+      let ext;
+      if (m) {
+        buf = Buffer.from(m[2], 'base64');
+        ext = m[1].toLowerCase() === 'png' ? 'png' : 'jpg';
+      } else {
+        const img = nativeImage.createFromDataURL(src);
+        if (img.isEmpty()) { out.push(null); continue; }
+        buf = img.toJPEG(92);
+        ext = 'jpg';
+      }
+      const file = path.join(dir, `photo-${String(i + 1).padStart(2, '0')}.${ext}`);
+      await fs.promises.writeFile(file, buf);
+      out.push(file);
+    }
+    if (token !== prepToken) return 0; // طلب أحدث حلّ محلّ هذا
+    dragFiles = out;
+    const first = out.find(Boolean);
+    if (first) {
+      const ic = nativeImage.createFromPath(first);
+      dragIcon = ic.isEmpty() ? null : ic.resize({ width: 64 });
+    }
+    return out.filter(Boolean).length;
+  } catch (e) {
+    return 0;
+  }
+});
+
+ipcMain.on('share:startDrag', (e, idx) => {
+  const files = (Array.isArray(idx) ? idx : [])
+    .filter((i) => Number.isInteger(i))
+    .map((i) => dragFiles[i])
+    .filter(Boolean);
+  if (!files.length || !dragIcon) return;
+  try {
+    e.sender.startDrag({ file: files[0], files, icon: dragIcon });
+  } catch (err) {}
 });
 
 // ---------- الطباعة ----------

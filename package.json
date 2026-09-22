@@ -19,12 +19,20 @@
     "files": [
       "main.js",
       "storage.js",
+      "license.js",
       "preload.js",
       "index.html",
       "renderer.js",
       "export.js",
       "style.css"
     ],
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true
+    },
     "win": {
       "target": [
         "nsis",

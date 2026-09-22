@@ -19,8 +19,10 @@
         <button class="tab" data-tab="stats">الإحصائيات</button>
         <button class="tab" data-tab="print">الطباعة</button>
         <button class="tab" data-tab="settings">الإعدادات</button>
+        <button class="tab" data-tab="activate">التفعيل</button>
         <button class="tab" data-tab="about">حول البرنامج</button>
       </nav>
+      <button type="button" class="lic-badge" id="licBadge" hidden></button>
     </header>
 
     <main>
@@ -60,6 +62,16 @@
             <label>عدد الحمامات (على الأقل)
               <input id="a-baths" inputmode="numeric">
             </label>
+            <label>عرض الشارع (على الأقل، م)
+              <input id="a-street" inputmode="decimal">
+            </label>
+            <label>الركن
+              <select id="a-corner">
+                <option value="">الكل</option>
+                <option value="1">ركن فقط</option>
+                <option value="0">غير ركن</option>
+              </select>
+            </label>
           </div>
         </div>
         <div id="list" class="list"></div>
@@ -95,6 +107,12 @@
             </label>
             <label>النزال — عمق البيت أو الأرض (م)
               <input id="f-depth" inputmode="decimal" placeholder="مثال: 25">
+            </label>
+            <label>عرض الشارع أمام العقار (م)
+              <input id="f-street" inputmode="decimal" placeholder="مثال: 12">
+            </label>
+            <label class="check">
+              <input type="checkbox" id="f-corner"> القطعة ركن (على شارعين)
             </label>
             <label>واجهة البيت
               <select id="f-facade"></select>
@@ -196,7 +214,7 @@
             </label>
             <label class="wide">نص رسالة واتساب
               <textarea id="s-tpl" rows="8"></textarea>
-              <small class="hint">المتغيرات: {الاسم} {المنطقة} {المساحة} {النزال} {الواجهة} {السنة} {النوع} {نوع القطعة} {الغرف} {السعر} {الحالة} {الموقع} {المكتب}</small>
+              <small class="hint">المتغيرات: {الاسم} {المنطقة} {المساحة} {النزال} {الواجهة} {الشارع} {ركن} {السنة} {النوع} {نوع القطعة} {الغرف} {السعر} {الحالة} {الموقع} {المكتب}</small>
             </label>
           </div>
           <div class="actions">
@@ -240,6 +258,30 @@
         </div>
       </section>
       <!-- تبويب: حول البرنامج -->
+      <!-- تبويب: التفعيل -->
+      <section class="panel" id="tab-activate">
+        <div class="card-box activate">
+          <h2>تفعيل البرنامج</h2>
+          <div class="lic-state" id="licState"></div>
+          <dl class="about-list">
+            <dt>رقم الجهاز</dt>
+            <dd><span class="mono" id="licMachine" dir="ltr"></span> <button type="button" class="btn ghost small" id="licCopyId">نسخ</button></dd>
+            <dt>العميل</dt><dd id="licCustomer">—</dd>
+            <dt>صلاحية التفعيل</dt><dd id="licExpires">—</dd>
+          </dl>
+          <label>مفتاح التفعيل
+            <textarea id="licKey" rows="4" dir="ltr" spellcheck="false" placeholder="الصق مفتاح التفعيل هنا"></textarea>
+          </label>
+          <p class="lic-msg" id="licMsg" hidden></p>
+          <div class="actions">
+            <button type="button" class="btn primary" id="licActivate">تفعيل</button>
+            <button type="button" class="btn wa" id="licWa">طلب مفتاح التفعيل عبر واتساب</button>
+          </div>
+          <p class="hint">الخطوات: انسخ «رقم الجهاز» وأرسله إلى المطوّر ← يرسل لك مفتاح التفعيل ← الصقه هنا واضغط «تفعيل». المفتاح يعمل على هذا الجهاز فقط.</p>
+          <p class="hint" id="licTrialNote"></p>
+        </div>
+      </section>
+
       <section class="panel" id="tab-about">
         <div class="card-box about">
           <h2>حول البرنامج</h2>
@@ -267,8 +309,13 @@
         <textarea id="wa-text" rows="9"></textarea>
       </label>
       <div id="wa-photos-box">
-        <p class="hint">واتساب لا يقبل إرفاق الصور تلقائياً من الروابط. اضغط على صورة لنسخها، ثم الصقها (Ctrl+V) في المحادثة بعد فتحها، وكرر لكل صورة.</p>
+        <p class="hint">افتح المحادثة أولاً بزر «فتح واتساب»، ثم اسحب الصور المحددة وأفلتها داخل المحادثة دفعة واحدة. اضغط على صورة لتحديدها أو إلغاء تحديدها، وزر ⧉ ينسخ الصورة للصقها بـ Ctrl+V.</p>
+        <div class="wa-tools">
+          <button class="btn ghost" id="wa-selall" type="button">إلغاء تحديد الكل</button>
+          <span class="hint" id="wa-count"></span>
+        </div>
         <div class="gallery small" id="wa-photos"></div>
+        <div class="wa-drag" id="wa-drag" draggable="true">⠿ اسحب الصور المحددة إلى واتساب</div>
       </div>
       <div class="actions">
         <button class="btn primary" id="wa-open">فتح واتساب</button>

@@ -11,7 +11,7 @@ const SOLD = 'مباع'; // الحالة التي تُحسب كـ «مباع» �
 const STATUS_CLASS = { 'للبيع': 'st-sale', 'للإيجار': 'st-rent', 'محجوز': 'st-reserved', 'مباع': 'st-sold', 'مؤجر': 'st-sold' };
 const COUNTRY_CODE = '964'; // مفتاح الدولة ثابت
 
-const DEFAULT_TPL =
+const TPL_BASE =
   'السلام عليكم {الاسم}،\n' +
   'تفاصيل العقار:\n' +
   'النوع: {النوع}\n' +
@@ -23,10 +23,12 @@ const DEFAULT_TPL =
   'السعر: {السعر}\n' +
   'الموقع: {الموقع}\n\n' +
   '{المكتب}';
+// القالب الافتراضي الجديد: يضيف عرض الشارع والركن (السطر يُحذف تلقائياً إن كانت القيمة فارغة)
+const DEFAULT_TPL = TPL_BASE.replace('الواجهة: {الواجهة}\n', 'الواجهة: {الواجهة}\nعرض الشارع: {الشارع} م\nركن: {ركن}\n');
 
-// القالب الافتراضي قبل إضافة «رقم المقاطعة»: إن وُجد محفوظاً كما هو (لم يعدّله المستخدم) يُرقّى إلى الجديد
-const LEGACY_TPL = DEFAULT_TPL.replace('رقم المقاطعة: {المقاطعة}\n', '');
-const upgradeSettings = (st) => (st && st.tpl === LEGACY_TPL ? Object.assign({}, st, { tpl: DEFAULT_TPL }) : st);
+// القوالب الافتراضية السابقة: إن وُجد أحدها محفوظاً كما هو (لم يعدّله المستخدم) يُرقّى إلى الجديد
+const LEGACY_TPLS = [TPL_BASE.replace('رقم المقاطعة: {المقاطعة}\n', ''), TPL_BASE];
+const upgradeSettings = (st) => (st && LEGACY_TPLS.includes(st.tpl) ? Object.assign({}, st, { tpl: DEFAULT_TPL }) : st);
 
 let db = {
   records: [],
@@ -35,6 +37,8 @@ let db = {
 };
 let currentPhotos = [];
 let waRec = null;
+const waSel = new Set();
+let waReady = false;
 let preview = { type: 'one', id: null };
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -65,9 +69,19 @@ async function persist(opts = {}) {
       ids.forEach((id) => dirtyPhotos.add(id));
       throw err;
     }
+    if (r && (r.locked || r.limit)) {
+      ids.forEach((id) => dirtyPhotos.add(id));
+      licenseDenied(r);
+      throw new Error('license-denied');
+    }
   } else {
     r = await window.api.save(db);
+    if (r && (r.locked || r.limit)) {
+      licenseDenied(r);
+      throw new Error('license-denied');
+    }
   }
+  renderLicBadge();
   if (r && r.backupError) toast('تعذّر النسخ الاحتياطي التلقائي — تحقق من مجلد النسخ في الإعدادات');
 }
 
@@ -82,12 +96,18 @@ function toast(msg) {
 
 // ---------- التبويبات ----------
 function showTab(name) {
+  if (licLocked && name !== 'activate') name = 'activate';
+  if (name === 'form' && !$('#f-id').value && !canAdd()) {
+    toast(limitMsg());
+    name = 'activate';
+  }
   $$('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
   $$('.panel').forEach((p) => p.classList.toggle('active', p.id === 'tab-' + name));
   if (name === 'print') fillPrintSelect();
   if (name === 'stats') renderStats();
   if (name === 'print' || name === 'settings') refreshAreas();
   if (name === 'settings') refreshBackups();
+  if (name === 'activate') fillActivate();
 }
 $$('.tab').forEach((t) => t.addEventListener('click', () => showTab(t.dataset.tab)));
 $('#btnAboutWa').addEventListener('click', () => window.api.openExternal('https://wa.me/9647736970504'));
@@ -133,6 +153,8 @@ function fillTemplate(r) {
     '{المساحة}': r.size,
     '{النزال}': r.depth,
     '{الواجهة}': r.facade,
+    '{الشارع}': r.street,
+    '{ركن}': r.corner ? 'نعم' : '',
     '{السنة}': r.year,
     '{النوع}': r.type,
     '{نوع القطعة}': r.landType,
@@ -143,8 +165,25 @@ function fillTemplate(r) {
     '{المكتب}': db.settings.office
   };
   let t = db.settings.tpl || DEFAULT_TPL;
+  // السطر الذي يحوي {الشارع} أو {ركن} يُحذف كاملاً إن لم تكن له قيمة
+  t = t.split('\n').filter((line) => !['{الشارع}', '{ركن}'].some((k) => line.includes(k) && !map[k])).join('\n');
   for (const k in map) t = t.split(k).join(map[k] || '-');
   return t.trim();
+}
+
+function waUpdateCount() {
+  const total = photosOf(waRec || {}).length;
+  $('#wa-count').textContent = `${waSel.size} من ${total} محددة`;
+  $('#wa-selall').textContent = waSel.size === total ? 'إلغاء تحديد الكل' : 'تحديد الكل';
+  $('#wa-drag').textContent = waSel.size ? `⠿ اسحب ${waSel.size === 1 ? 'صورة واحدة' : waSel.size === 2 ? 'صورتين' : waSel.size + ' صور'} إلى واتساب` : 'حدد صورة واحدة على الأقل';
+}
+
+// السحب: الصور المحددة كلها، أو الصورة المسحوبة وحدها إن لم تكن ضمن المحددة
+function waDrag(e, idx) {
+  e.preventDefault();
+  if (!idx.length) return toast('حدد صورة واحدة على الأقل');
+  if (!waReady) return toast('جارٍ تجهيز الصور... حاول بعد لحظة');
+  window.api.startDrag(idx);
 }
 
 function openWa(r) {
@@ -153,7 +192,18 @@ function openWa(r) {
   $('#wa-text').value = fillTemplate(r);
   const ph = photosOf(r);
   $('#wa-photos-box').hidden = !ph.length;
-  $('#wa-photos').innerHTML = ph.map((p, i) => `<div class="g-item pick" data-i="${i}" style="background-image:url('${p}')"></div>`).join('');
+  waSel.clear();
+  ph.forEach((_, i) => waSel.add(i)); // افتراضياً كل الصور محددة
+  $('#wa-photos').innerHTML = ph
+    .map((p, i) => `<div class="g-item pick sel" draggable="true" data-i="${i}" style="background-image:url('${p}')"><span class="pk-check">✓</span><button type="button" class="pk-copy" data-copy="${i}" title="نسخ الصورة">⧉</button></div>`)
+    .join('');
+  waUpdateCount();
+  // تجهيز ملفات الصور مسبقاً كي يبدأ السحب فوراً
+  waReady = false;
+  if (ph.length && typeof window.api.prepareShare === 'function') {
+    const rec = r;
+    window.api.prepareShare(ph).then((n) => { if (waRec === rec) waReady = n > 0; });
+  }
   $('#waModal').hidden = false;
 }
 $('#wa-close').addEventListener('click', () => ($('#waModal').hidden = true));
@@ -163,12 +213,153 @@ $('#wa-open').addEventListener('click', () => {
   window.api.openExternal('https://wa.me/' + phone + '?text=' + encodeURIComponent($('#wa-text').value));
 });
 $('#wa-photos').addEventListener('click', async (e) => {
+  if (!waRec) return;
+  const cp = e.target.closest('.pk-copy');
+  if (cp) {
+    e.stopPropagation();
+    const p = photosOf(waRec)[Number(cp.dataset.copy)];
+    const ok = p ? await window.api.copyImage(p) : false;
+    return toast(ok ? 'تم نسخ الصورة — الصقها في المحادثة' : 'تعذّر نسخ الصورة');
+  }
   const it = e.target.closest('.pick');
-  if (!it || !waRec) return;
-  const p = photosOf(waRec)[Number(it.dataset.i)];
-  const ok = p ? await window.api.copyImage(p) : false;
-  toast(ok ? 'تم نسخ الصورة — الصقها في المحادثة' : 'تعذّر نسخ الصورة');
+  if (!it) return;
+  const i = Number(it.dataset.i);
+  if (waSel.has(i)) waSel.delete(i);
+  else waSel.add(i);
+  it.classList.toggle('sel', waSel.has(i));
+  waUpdateCount();
 });
+$('#wa-photos').addEventListener('dragstart', (e) => {
+  const it = e.target.closest && e.target.closest('.pick');
+  if (!it) return;
+  const i = Number(it.dataset.i);
+  waDrag(e, waSel.has(i) ? [...waSel].sort((a, b) => a - b) : [i]);
+});
+$('#wa-drag').addEventListener('dragstart', (e) => waDrag(e, [...waSel].sort((a, b) => a - b)));
+$('#wa-selall').addEventListener('click', () => {
+  const ph = photosOf(waRec || {});
+  const all = waSel.size !== ph.length;
+  waSel.clear();
+  if (all) ph.forEach((_, i) => waSel.add(i));
+  $$('#wa-photos .pick').forEach((el) => el.classList.toggle('sel', all));
+  waUpdateCount();
+});
+
+
+// ---------- التفعيل ----------
+let lic = null;
+let licLocked = false;
+const WA_DEV = '9647736970504';
+const unit = (n, one, two, many) => (n === 1 ? one : n === 2 ? two : many);
+function fmtLeft(ms) {
+  const mins = Math.max(1, Math.ceil(ms / 60000));
+  const d = Math.floor(mins / 1440), h = Math.floor((mins % 1440) / 60), m = mins % 60;
+  if (d) return `${d === 1 ? 'يوم' : d === 2 ? 'يومان' : d + ' أيام'}${h ? ' و ' + h + ' ' + unit(h, 'ساعة', 'ساعتان', 'ساعات') : ''}`;
+  if (h) return `${h === 1 ? 'ساعة' : h === 2 ? 'ساعتان' : h + ' ساعات'}${m ? ' و ' + m + ' دقيقة' : ''}`;
+  return `${m} دقيقة`;
+}
+const canAdd = () => !lic || lic.state === 'active' || (lic.state === 'trial' && db.records.length < lic.maxRecords);
+const limitMsg = () => `النسخة التجريبية تسمح بـ ${lic ? lic.maxRecords : 5} عقارات فقط — فعّل البرنامج لإضافة المزيد`;
+
+function renderLicBadge() {
+  const b = $('#licBadge');
+  if (!lic) return;
+  b.hidden = false;
+  if (lic.state === 'active') {
+    b.textContent = '✓ مفعّل';
+    b.className = 'lic-badge ok';
+  } else if (lic.state === 'trial') {
+    b.textContent = `تجريبي: ${fmtLeft(lic.msLeft)} • ${db.records.length}/${lic.maxRecords} عقارات`;
+    b.className = 'lic-badge trial';
+  } else {
+    b.textContent = 'غير مفعّل';
+    b.className = 'lic-badge locked';
+  }
+}
+
+function fillActivate() {
+  if (!lic) return;
+  $('#licMachine').textContent = lic.machineId;
+  $('#licCustomer').textContent = lic.customer || '—';
+  $('#licExpires').textContent = lic.state === 'active' || lic.reason === 'license-expired' ? (lic.expires ? lic.expires : 'دائم (بدون انتهاء)') : '—';
+  const box = $('#licState');
+  if (lic.state === 'active') {
+    box.className = 'lic-state ok';
+    box.textContent = '✓ البرنامج مفعّل على هذا الجهاز';
+  } else if (lic.state === 'trial') {
+    box.className = 'lic-state trial';
+    box.textContent = `نسخة تجريبية — المتبقي ${fmtLeft(lic.msLeft)} • الحد الأقصى ${lic.maxRecords} عقارات (المُضاف: ${db.records.length})`;
+  } else {
+    box.className = 'lic-state locked';
+    box.textContent =
+      lic.reason === 'license-expired' ? `انتهت صلاحية التفعيل${lic.expires ? ' بتاريخ ' + lic.expires : ''} — جدّد التفعيل للمتابعة`
+      : lic.reason === 'tampered' ? 'تعذّر التحقق من الفترة التجريبية — فعّل البرنامج للمتابعة'
+      : `انتهت الفترة التجريبية (${lic.trialDays} أيام) — فعّل البرنامج للمتابعة`;
+  }
+  $('#licTrialNote').textContent = lic.state === 'active' ? '' : `بدون تفعيل: ${lic.trialDays} أيام تجريبية وبحد أقصى ${lic.maxRecords || 5} عقارات.`;
+}
+
+function applyLicense() {
+  if (!lic) return;
+  licLocked = lic.state === 'expired';
+  $$('.tab').forEach((t) => (t.hidden = licLocked && t.dataset.tab !== 'activate'));
+  renderLicBadge();
+  if (licLocked) {
+    $$('.modal').forEach((m) => (m.hidden = true));
+    showTab('activate');
+  } else if ($('#tab-activate').classList.contains('active')) {
+    fillActivate();
+  }
+}
+
+async function refreshLicense() {
+  if (typeof window.api.licenseStatus !== 'function') return;
+  try {
+    lic = await window.api.licenseStatus();
+    applyLicense();
+  } catch (e) {}
+}
+
+function licenseDenied(r) {
+  refreshLicense();
+  toast(r.limit ? limitMsg() : 'انتهت فترة التجربة — فعّل البرنامج للمتابعة');
+}
+
+$('#licBadge').addEventListener('click', () => showTab('activate'));
+$('#licCopyId').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($('#licMachine').textContent);
+    toast('تم نسخ رقم الجهاز');
+  } catch (e) {
+    toast('تعذّر النسخ — انسخ الرقم يدوياً');
+  }
+});
+$('#licWa').addEventListener('click', () => {
+  const id = lic ? lic.machineId : '';
+  const text = 'السلام عليكم، أرغب بتفعيل برنامج إدارة العقارات.\nرقم الجهاز: ' + id + '\nالاسم: ';
+  window.api.openExternal('https://wa.me/' + WA_DEV + '?text=' + encodeURIComponent(text));
+});
+$('#licActivate').addEventListener('click', async () => {
+  const key = $('#licKey').value.trim();
+  const msg = $('#licMsg');
+  msg.hidden = true;
+  if (!key) return toast('الصق مفتاح التفعيل أولاً');
+  if (typeof window.api.licenseActivate !== 'function') return toast('التفعيل غير متاح في هذه النسخة');
+  const res = await window.api.licenseActivate(key);
+  if (!res || !res.ok) {
+    msg.textContent = (res && res.error) || 'تعذّر التفعيل';
+    msg.hidden = false;
+    return;
+  }
+  lic = res.status;
+  $('#licKey').value = '';
+  const wasLocked = licLocked;
+  applyLicense();
+  toast('تم تفعيل البرنامج بنجاح ✓');
+  if (wasLocked) showTab('list');
+});
+setInterval(refreshLicense, 60000);
+window.addEventListener('focus', refreshLicense);
 
 // ---------- المناطق المحفوظة ----------
 const NO_AREA = 'بدون منطقة';
@@ -218,7 +409,7 @@ $('#btnAddArea').addEventListener('click', async () => {
 });
 
 // ---------- النموذج ----------
-const FIELDS = ['clientName', 'phone', 'area', 'district', 'size', 'depth', 'year', 'rooms', 'baths', 'floors', 'price', 'location', 'notes'];
+const FIELDS = ['clientName', 'phone', 'area', 'district', 'size', 'depth', 'street', 'year', 'rooms', 'baths', 'floors', 'price', 'location', 'notes'];
 
 function toggleHouseFields() {
   const isLand = $('#f-type').value === LAND;
@@ -263,6 +454,7 @@ function resetForm() {
   $('#f-id').value = '';
   FIELDS.forEach((k) => ($('#f-' + k).value = ''));
   $('#f-facade').value = '';
+  $('#f-corner').checked = false;
   $('#f-status').value = 'للبيع';
   $('#f-currency').value = 'IQD';
   $('#f-type').value = '';
@@ -281,6 +473,7 @@ function editRecord(id) {
   $('#f-id').value = r.id;
   FIELDS.forEach((k) => ($('#f-' + k).value = r[k] || ''));
   $('#f-facade').value = r.facade || '';
+  $('#f-corner').checked = !!r.corner;
   $('#f-status').value = r.status || 'للبيع';
   $('#f-currency').value = r.currency || 'IQD';
   $('#f-type').value = r.type || '';
@@ -368,10 +561,15 @@ $('#recForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const id = $('#f-id').value;
   const old = db.records.find((x) => x.id === id);
+  if (!old && !canAdd()) {
+    toast(limitMsg());
+    return showTab('activate');
+  }
   const rec = {
     id: id || String(Date.now()),
     createdAt: old ? old.createdAt : new Date().toISOString(),
     facade: $('#f-facade').value,
+    corner: $('#f-corner').checked,
     type: $('#f-type').value,
     landType: $('#f-type').value === LAND ? $('#f-landType').value : '',
     status: $('#f-status').value,
@@ -380,7 +578,7 @@ $('#recForm').addEventListener('submit', async (e) => {
   };
   rec.thumb = !currentPhotos[0] ? '' : old && old.thumb && photosOf(old)[0] === currentPhotos[0] ? old.thumb : await makeThumb(currentPhotos[0]);
   if (!old || JSON.stringify(photosOf(old)) !== JSON.stringify(currentPhotos)) dirtyPhotos.add(rec.id);
-  const numeric = ['phone', 'district', 'size', 'depth', 'year', 'rooms', 'baths', 'floors']; // تُحوَّل الأرقام العربية إلى لاتينية
+  const numeric = ['phone', 'district', 'size', 'depth', 'street', 'year', 'rooms', 'baths', 'floors']; // تُحوَّل الأرقام العربية إلى لاتينية
   FIELDS.forEach((k) => {
     const v = $('#f-' + k).value.trim();
     rec[k] = numeric.includes(k) ? toLatin(v) : v;
@@ -413,6 +611,8 @@ function card(r) {
     r.size && `<span>المساحة: <b>${esc(r.size)} م²</b></span>`,
     r.depth && `<span>النزال: <b>${esc(r.depth)} م</b></span>`,
     r.facade && `<span>الواجهة: <b>${esc(r.facade)}</b></span>`,
+    r.street && `<span>عرض الشارع: <b>${esc(r.street)} م</b></span>`,
+    r.corner && `<span>ركن: <b>نعم</b></span>`,
     r.year && `<span>سنة البناء: <b>${esc(r.year)}</b></span>`,
     r.rooms && `<span>الغرف: <b>${esc(r.rooms)}</b></span>`,
     r.baths && `<span>الحمامات: <b>${esc(r.baths)}</b></span>`,
@@ -448,7 +648,8 @@ function getAdv() {
     yearMin: g('yearMin'), yearMax: g('yearMax'),
     priceMin: g('priceMin'), priceMax: g('priceMax'),
     currency: $('#a-currency').value,
-    rooms: g('rooms'), baths: g('baths')
+    rooms: g('rooms'), baths: g('baths'),
+    street: g('street'), corner: $('#a-corner').value
   };
 }
 function advActive(a) {
@@ -458,7 +659,9 @@ function advActive(a) {
     (a.yearMin !== null || a.yearMax !== null ? 1 : 0) +
     (a.priceMin !== null || a.priceMax !== null ? 1 : 0) +
     (a.rooms !== null ? 1 : 0) +
-    (a.baths !== null ? 1 : 0)
+    (a.baths !== null ? 1 : 0) +
+    (a.street !== null ? 1 : 0) +
+    (a.corner ? 1 : 0)
   );
 }
 function inRange(v, min, max) {
@@ -477,6 +680,9 @@ function matchAdv(r, a) {
   }
   if (a.rooms !== null) { const n = num(r.rooms); if (n === null || n < a.rooms) return false; }
   if (a.baths !== null) { const n = num(r.baths); if (n === null || n < a.baths) return false; }
+  if (a.street !== null) { const n = num(r.street); if (n === null || n < a.street) return false; }
+  if (a.corner === '1' && !r.corner) return false;
+  if (a.corner === '0' && r.corner) return false;
   return true;
 }
 let lastIds = [];
@@ -554,7 +760,7 @@ $$('#advPanel input, #advPanel select').forEach((el) => {
   el.addEventListener('change', renderList);
 });
 $('#btnClearAll').addEventListener('click', () => {
-  ['#areaFilter', '#statusFilter', '#typeFilter', '#search', '#a-facade'].forEach((id) => ($(id).value = ''));
+  ['#areaFilter', '#statusFilter', '#typeFilter', '#search', '#a-facade', '#a-corner'].forEach((id) => ($(id).value = ''));
   $$('#advPanel input').forEach((el) => (el.value = ''));
   $('#a-currency').value = 'IQD';
   renderList();
@@ -645,6 +851,8 @@ function sheetHTML() {
       ${row('المساحة', r.size ? r.size + ' م²' : '')}
       ${row('النزال (العمق)', r.depth ? r.depth + ' م' : '')}
       ${row('الواجهة', r.facade)}
+      ${row('عرض الشارع', r.street ? r.street + ' م' : '')}
+      ${row('ركن', r.corner ? 'نعم' : '')}
       ${row('سنة البناء', r.year)}
       ${row('عدد الغرف', r.rooms)}
       ${row('عدد الحمامات', r.baths)}
@@ -857,6 +1065,10 @@ async function restoreFromText(text) {
   try {
     const data = JSON.parse(text);
     if (!Array.isArray(data.records)) throw new Error('bad');
+    if (lic && lic.state === 'trial' && data.records.length > lic.maxRecords) {
+      toast(limitMsg());
+      return showTab('activate');
+    }
     if (!confirm('سيتم استبدال البيانات الحالية بهذه النسخة. متابعة؟')) return;
     db = { records: data.records, areas: data.areas || [], settings: Object.assign({}, db.settings, upgradeSettings(data.settings) || {}) };
     db.records.forEach((r) => dirtyPhotos.add(r.id));
@@ -926,5 +1138,6 @@ $('#b-list').addEventListener('click', async (e) => {
   refreshAreas();
   fillSettings();
   renderList();
+  await refreshLicense();
   setTimeout(backfillThumbs, 500);
 })();
