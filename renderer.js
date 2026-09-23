@@ -5,6 +5,8 @@ const FACADES = ['شمال', 'جنوب', 'شرق', 'غرب', 'شمال شرق', 
 const MAX_PHOTOS = 10;
 const TYPES = ['بيت', 'شقة', 'أرض', 'محل', 'عمارة', 'مكتب'];
 const LAND = 'أرض'; // لا تظهر له الغرف والحمامات والطوابق
+// الكلمة التي تحل محل «العقار» في تسميات النموذج (مساحة العقار، عرض واجهة العقار...) حسب النوع المختار
+const TYPE_NOUN = { 'بيت': 'البيت', 'شقة': 'الشقة', 'أرض': 'الأرض', 'محل': 'المحل', 'عمارة': 'العمارة', 'مكتب': 'المكتب' };
 const LAND_TYPES = ['سكنية', 'تجارية', 'زراعية', 'صناعية', 'سكنية تجارية']; // نوع القطعة (للأراضي فقط)
 const STATUSES = ['للبيع', 'للإيجار', 'محجوز', 'مباع', 'مؤجر'];
 const SOLD = 'مباع'; // الحالة التي تُحسب كـ «مباع» في الإحصائيات (المؤجر لا يُحسب)
@@ -24,7 +26,7 @@ const TPL_BASE =
   'الموقع: {الموقع}\n\n' +
   '{المكتب}';
 // القالب الافتراضي الجديد: يضيف عرض الشارع والركن (السطر يُحذف تلقائياً إن كانت القيمة فارغة)
-const DEFAULT_TPL = TPL_BASE.replace('الواجهة: {الواجهة}\n', 'الواجهة: {الواجهة}\nعرض الشارع: {الشارع} م\nركن: {ركن}\n');
+const DEFAULT_TPL = TPL_BASE.replace('الواجهة: {الواجهة}\n', 'عرض الواجهة: {عرض_الواجهة} م\nالواجهة: {الواجهة}\nعرض الشارع: {الشارع} م\nركن: {ركن}\n');
 
 // القوالب الافتراضية السابقة: إن وُجد أحدها محفوظاً كما هو (لم يعدّله المستخدم) يُرقّى إلى الجديد
 const LEGACY_TPLS = [TPL_BASE.replace('رقم المقاطعة: {المقاطعة}\n', ''), TPL_BASE];
@@ -153,6 +155,7 @@ function fillTemplate(r) {
     '{المساحة}': r.size,
     '{النزال}': r.depth,
     '{الواجهة}': r.facade,
+    '{عرض_الواجهة}': r.facadeWidth,
     '{الشارع}': r.street,
     '{ركن}': r.corner ? 'نعم' : '',
     '{السنة}': r.year,
@@ -166,7 +169,7 @@ function fillTemplate(r) {
   };
   let t = db.settings.tpl || DEFAULT_TPL;
   // السطر الذي يحوي {الشارع} أو {ركن} يُحذف كاملاً إن لم تكن له قيمة
-  t = t.split('\n').filter((line) => !['{الشارع}', '{ركن}'].some((k) => line.includes(k) && !map[k])).join('\n');
+  t = t.split('\n').filter((line) => !['{عرض_الواجهة}', '{الشارع}', '{ركن}'].some((k) => line.includes(k) && !map[k])).join('\n');
   for (const k in map) t = t.split(k).join(map[k] || '-');
   return t.trim();
 }
@@ -391,6 +394,10 @@ function refreshAreas() {
 $('#areaFilter').addEventListener('change', renderList);
 $('#statusFilter').addEventListener('change', renderList);
 $('#typeFilter').addEventListener('change', renderList);
+$('#hideSold').addEventListener('change', () => {
+  try { localStorage.setItem('re_hideSold', $('#hideSold').checked ? '1' : '0'); } catch (e) {}
+  renderList();
+});
 $('#areaChips').addEventListener('click', async (e) => {
   const b = e.target.closest('button[data-area]');
   if (!b) return;
@@ -409,12 +416,14 @@ $('#btnAddArea').addEventListener('click', async () => {
 });
 
 // ---------- النموذج ----------
-const FIELDS = ['clientName', 'phone', 'area', 'district', 'size', 'depth', 'street', 'year', 'rooms', 'baths', 'floors', 'price', 'location', 'notes'];
+const FIELDS = ['clientName', 'phone', 'area', 'district', 'size', 'depth', 'facadeWidth', 'street', 'year', 'rooms', 'baths', 'floors', 'price', 'location', 'notes'];
 
 function toggleHouseFields() {
-  const isLand = $('#f-type').value === LAND;
+  const t = $('#f-type').value;
+  const isLand = t === LAND;
   $$('.house-only').forEach((el) => (el.hidden = isLand));
   $$('.land-only').forEach((el) => (el.hidden = !isLand));
+  $$('.type-noun').forEach((el) => (el.textContent = TYPE_NOUN[t] || 'العقار'));
 }
 $('#f-type').addEventListener('change', toggleHouseFields);
 
@@ -578,7 +587,7 @@ $('#recForm').addEventListener('submit', async (e) => {
   };
   rec.thumb = !currentPhotos[0] ? '' : old && old.thumb && photosOf(old)[0] === currentPhotos[0] ? old.thumb : await makeThumb(currentPhotos[0]);
   if (!old || JSON.stringify(photosOf(old)) !== JSON.stringify(currentPhotos)) dirtyPhotos.add(rec.id);
-  const numeric = ['phone', 'district', 'size', 'depth', 'street', 'year', 'rooms', 'baths', 'floors']; // تُحوَّل الأرقام العربية إلى لاتينية
+  const numeric = ['phone', 'district', 'size', 'depth', 'facadeWidth', 'street', 'year', 'rooms', 'baths', 'floors']; // تُحوَّل الأرقام العربية إلى لاتينية
   FIELDS.forEach((k) => {
     const v = $('#f-' + k).value.trim();
     rec[k] = numeric.includes(k) ? toLatin(v) : v;
@@ -610,6 +619,7 @@ function card(r) {
     r.district && `<span>رقم المقاطعة: <b>${esc(r.district)}</b></span>`,
     r.size && `<span>المساحة: <b>${esc(r.size)} م²</b></span>`,
     r.depth && `<span>النزال: <b>${esc(r.depth)} م</b></span>`,
+    r.facadeWidth && `<span>عرض الواجهة: <b>${esc(r.facadeWidth)} م</b></span>`,
     r.facade && `<span>الواجهة: <b>${esc(r.facade)}</b></span>`,
     r.street && `<span>عرض الشارع: <b>${esc(r.street)} م</b></span>`,
     r.corner && `<span>ركن: <b>نعم</b></span>`,
@@ -649,7 +659,7 @@ function getAdv() {
     priceMin: g('priceMin'), priceMax: g('priceMax'),
     currency: $('#a-currency').value,
     rooms: g('rooms'), baths: g('baths'),
-    street: g('street'), corner: $('#a-corner').value
+    street: g('street'), facadeWidth: g('facadeWidth'), corner: $('#a-corner').value
   };
 }
 function advActive(a) {
@@ -661,6 +671,7 @@ function advActive(a) {
     (a.rooms !== null ? 1 : 0) +
     (a.baths !== null ? 1 : 0) +
     (a.street !== null ? 1 : 0) +
+    (a.facadeWidth !== null ? 1 : 0) +
     (a.corner ? 1 : 0)
   );
 }
@@ -681,6 +692,7 @@ function matchAdv(r, a) {
   if (a.rooms !== null) { const n = num(r.rooms); if (n === null || n < a.rooms) return false; }
   if (a.baths !== null) { const n = num(r.baths); if (n === null || n < a.baths) return false; }
   if (a.street !== null) { const n = num(r.street); if (n === null || n < a.street) return false; }
+  if (a.facadeWidth !== null) { const n = num(r.facadeWidth); if (n === null || n < a.facadeWidth) return false; }
   if (a.corner === '1' && !r.corner) return false;
   if (a.corner === '0' && r.corner) return false;
   return true;
@@ -691,21 +703,23 @@ let listLimit = PAGE;
 let listSig = '';
 let moreObs;
 
+const CLOSED_STATUSES = ['مباع', 'مؤجر'];
 function renderList() {
   const q = toLatin($('#search').value).trim().toLowerCase();
   const af = $('#areaFilter').value;
   const sf = $('#statusFilter').value;
   const tf = $('#typeFilter').value;
+  const hideSold = $('#hideSold').checked; // لا يُطبَّق إن اختار المستخدم حالة معيّنة صراحةً (كـ«مباع» ليراجعها)
   const adv = getAdv();
-  const rows = db.records.filter(
-    (r) => (!af || r.area === af) && (!sf || r.status === sf) && (!tf || r.type === tf) && matchAdv(r, adv) && toLatin([r.clientName, r.area, r.district, r.phone].join(' ')).toLowerCase().includes(q)
-  );
+  const base = db.records.filter((r) => (!af || r.area === af) && (!sf || r.status === sf) && (!tf || r.type === tf) && matchAdv(r, adv) && toLatin([r.clientName, r.area, r.district, r.phone].join(' ')).toLowerCase().includes(q));
+  const rows = hideSold && !sf ? base.filter((r) => !CLOSED_STATUSES.includes(r.status)) : base;
+  const hiddenCount = base.length - rows.length;
   const advN = advActive(adv);
   const filtered = !!(af || sf || tf || q || advN);
   lastIds = rows.map((r) => r.id);
-  const sig = [q, af, sf, tf, JSON.stringify(adv)].join('|');
+  const sig = [q, af, sf, tf, hideSold, JSON.stringify(adv)].join('|');
   if (sig !== listSig) { listSig = sig; listLimit = PAGE; } // تغيّر البحث/الفلتر: ابدأ من أول القائمة
-  $('#count').textContent = filtered ? `${rows.length} من ${db.records.length} عقار` : rows.length + ' عقار';
+  $('#count').textContent = (filtered ? `${rows.length} من ${db.records.length} عقار` : rows.length + ' عقار') + (hiddenCount ? ` (${hiddenCount} مخفي: مباع/مؤجَّر)` : '');
   $('#advCount').hidden = !advN;
   $('#advCount').textContent = advN;
   $('#btnClearAll').hidden = !filtered;
@@ -760,7 +774,7 @@ $$('#advPanel input, #advPanel select').forEach((el) => {
   el.addEventListener('change', renderList);
 });
 $('#btnClearAll').addEventListener('click', () => {
-  ['#areaFilter', '#statusFilter', '#typeFilter', '#search', '#a-facade', '#a-corner'].forEach((id) => ($(id).value = ''));
+  ['#areaFilter', '#statusFilter', '#typeFilter', '#search', '#a-facade', '#a-corner', '#a-facadeWidth'].forEach((id) => ($(id).value = ''));
   $$('#advPanel input').forEach((el) => (el.value = ''));
   $('#a-currency').value = 'IQD';
   renderList();
@@ -850,6 +864,7 @@ function sheetHTML() {
       ${row('رقم المقاطعة', r.district)}
       ${row('المساحة', r.size ? r.size + ' م²' : '')}
       ${row('النزال (العمق)', r.depth ? r.depth + ' م' : '')}
+      ${row('عرض الواجهة', r.facadeWidth ? r.facadeWidth + ' م' : '')}
       ${row('الواجهة', r.facade)}
       ${row('عرض الشارع', r.street ? r.street + ' م' : '')}
       ${row('ركن', r.corner ? 'نعم' : '')}
@@ -1135,6 +1150,7 @@ $('#b-list').addEventListener('click', async (e) => {
   if (saved && Array.isArray(saved.records)) {
     db = { records: saved.records, areas: saved.areas || [], settings: Object.assign({}, db.settings, upgradeSettings(saved.settings) || {}) };
   }
+  try { $('#hideSold').checked = localStorage.getItem('re_hideSold') !== '0'; } catch (e) {}
   refreshAreas();
   fillSettings();
   renderList();

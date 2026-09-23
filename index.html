@@ -36,6 +36,10 @@
           <button class="btn ghost" id="btnAdv">تصفية متقدمة <span class="badge st-sale" id="advCount" hidden></span></button>
           <button class="btn ghost" id="btnClearAll" hidden>مسح التصفية</button>
           <button class="btn ghost" id="btnPrintResults">طباعة النتائج</button>
+          <label class="hide-sold">
+            <input type="checkbox" id="hideSold" checked>
+            إخفاء المباع والمؤجَّر
+          </label>
           <span class="count" id="count"></span>
         </div>
         <div class="adv" id="advPanel" hidden>
@@ -64,6 +68,9 @@
             </label>
             <label>عرض الشارع (على الأقل، م)
               <input id="a-street" inputmode="decimal">
+            </label>
+            <label>عرض واجهة العقار (على الأقل، م)
+              <input id="a-facadeWidth" inputmode="decimal">
             </label>
             <label>الركن
               <select id="a-corner">
@@ -102,10 +109,13 @@
             <label class="land-only" hidden>نوع القطعة
               <select id="f-landType"></select>
             </label>
-            <label>مساحة البيت (م²)
+            <label>مساحة <span class="type-noun">العقار</span> (م²)
               <input id="f-size" inputmode="decimal">
             </label>
-            <label>النزال — عمق البيت أو الأرض (م)
+            <label>عرض واجهة <span class="type-noun">العقار</span> (م)
+              <input id="f-facadeWidth" inputmode="decimal" placeholder="مثال: 10">
+            </label>
+            <label>النزال — عمق <span class="type-noun">العقار</span> (م)
               <input id="f-depth" inputmode="decimal" placeholder="مثال: 25">
             </label>
             <label>عرض الشارع أمام العقار (م)
@@ -114,7 +124,7 @@
             <label class="check">
               <input type="checkbox" id="f-corner"> القطعة ركن (على شارعين)
             </label>
-            <label>واجهة البيت
+            <label>اتجاه واجهة <span class="type-noun">العقار</span>
               <select id="f-facade"></select>
             </label>
             <label>سنة البناء
@@ -152,7 +162,7 @@
             </label>
             <div class="wide">
               <div class="photo-head">
-                <span>صور البيت</span>
+                <span>صور <span class="type-noun">العقار</span></span>
                 <label class="btn ghost file-btn">إضافة صور
                   <input type="file" id="f-photo" accept="image/*" multiple hidden>
                 </label>
@@ -214,7 +224,7 @@
             </label>
             <label class="wide">نص رسالة واتساب
               <textarea id="s-tpl" rows="8"></textarea>
-              <small class="hint">المتغيرات: {الاسم} {المنطقة} {المساحة} {النزال} {الواجهة} {الشارع} {ركن} {السنة} {النوع} {نوع القطعة} {الغرف} {السعر} {الحالة} {الموقع} {المكتب}</small>
+              <small class="hint">المتغيرات: {الاسم} {المنطقة} {المساحة} {النزال} {عرض_الواجهة} {الواجهة} {الشارع} {ركن} {السنة} {النوع} {نوع القطعة} {الغرف} {السعر} {الحالة} {الموقع} {المكتب}</small>
             </label>
           </div>
           <div class="actions">

@@ -468,3 +468,6 @@ h2 { margin: 0 0 18px; font-size: 20px; }
   .brand { font-size: 16px; gap: 8px; }
   .lic-badge { font-size: 11px; padding: 4px 9px; }
 }
+
+.hide-sold { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--muted); white-space: nowrap; cursor: pointer; user-select: none; }
+.hide-sold input { cursor: pointer; }

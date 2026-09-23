@@ -110,7 +110,7 @@ function writeCopy(f, v) {
   } catch (e) {}
 }
 
-function createManager({ files, machineId, now = Date.now }) {
+function createManager({ files, machineId, now = Date.now, keystore = null }) {
   let mem = null;
   let lastWrite = 0;
 
@@ -126,12 +126,20 @@ function createManager({ files, machineId, now = Date.now }) {
     const t = now();
     if (!existing.length) {
       mem = { i: t, l: t, k: null };
-      persist();
     } else if (!valid.length) {
       mem = { tampered: true, i: 0, l: t, k: null }; // كل النسخ تالفة/معدَّلة
     } else {
       mem = { i: Math.min(...valid.map((v) => v.i)), l: Math.max(...valid.map((v) => v.l)), k: valid.map((v) => v.k).find(Boolean) || null };
     }
+    // استرجاع مفتاح التفعيل من مخزن دائم (سلسلة المفاتيح على ماك) إن لم يُوجد في ملفات البيانات —
+    // يعيد التفعيل تلقائياً حتى بعد حذف البرنامج وبياناته وإعادة تثبيته من جديد.
+    let healed = !existing.length;
+    if (!mem.k && keystore) {
+      let stored = null;
+      try { stored = keystore.get(); } catch (e) {}
+      if (stored) { mem.k = stored; healed = true; }
+    }
+    if (healed) persist();
   }
 
   function status() {
@@ -160,6 +168,7 @@ function createManager({ files, machineId, now = Date.now }) {
     if (!v.ok) return { ok: false, error: v.error };
     mem = { i: mem.tampered ? 0 : mem.i, l: eff, k: String(key).replace(/\s+/g, '') };
     persist();
+    if (keystore) { try { keystore.set(mem.k); } catch (e) {} } // حفظ دائم إضافي (سلسلة المفاتيح على ماك)
     return { ok: true, status: status() };
   }
 

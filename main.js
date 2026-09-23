@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const os = require('os');
 const { createStore } = require('./storage');
 const { createManager, systemMachineId } = require('./license');
+const { execFileSync } = require('child_process');
 
 let win;
 
@@ -59,7 +60,29 @@ ipcMain.handle('db:load', async () => {
 });
 
 // ---------- التفعيل ----------
-// نسخ متعددة لبيانات الفترة التجريبية في أماكن مختلفة، فلا تُعاد الفترة بمجرد حذف مجلد البيانات
+// نسخ متعددة لبيانات الفترة التجريبية في أماكن مختلفة، فلا تُعاد الفترة بمجرد حذف مجلد البيانات.
+// على ماك، يُحفظ مفتاح التفعيل أيضاً في سلسلة المفاتيح (Keychain) — مكان مستقل عن ملفات البرنامج
+// تماماً، فحذف البرنامج (أو حتى بياناته) وإعادة تثبيته يستعيد التفعيل تلقائياً دون إعادة إدخال المفتاح.
+const KC_SERVICE = 'com.ibrahim.realestatemanager.license';
+function macKeystore() {
+  if (process.platform !== 'darwin') return null;
+  const account = (os.userInfo().username || 'user').replace(/[^\w.-]/g, '_');
+  return {
+    get: () => {
+      try {
+        const out = execFileSync('security', ['find-generic-password', '-a', account, '-s', KC_SERVICE, '-w'], { encoding: 'utf8', timeout: 5000 });
+        return out.trim() || null;
+      } catch (e) {
+        return null; // لا يوجد مفتاح محفوظ، أو سلسلة المفاتيح غير متاحة
+      }
+    },
+    set: (key) => {
+      try {
+        execFileSync('security', ['add-generic-password', '-a', account, '-s', KC_SERVICE, '-w', key, '-U'], { timeout: 5000 });
+      } catch (e) {}
+    }
+  };
+}
 let _lic;
 const lic = () =>
   (_lic =
@@ -70,7 +93,8 @@ const lic = () =>
         path.join(app.getPath('appData'), '.rem-cache.dat'),
         path.join(os.homedir(), '.rem-cache.dat')
       ],
-      machineId: systemMachineId()
+      machineId: systemMachineId(),
+      keystore: macKeystore()
     }));
 ipcMain.handle('license:status', () => lic().status());
 ipcMain.handle('license:activate', (_e, key) => lic().activate(String(key || '')));
