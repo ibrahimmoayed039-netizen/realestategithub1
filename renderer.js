@@ -123,6 +123,49 @@ function fmtPrice(r) {
   if (!r.price || !isFinite(n)) return '';
   return n.toLocaleString('en-US') + ' ' + (r.currency === 'USD' ? 'دولار' : 'دينار');
 }
+
+// ---------- سعر المتر ----------
+const CUR_NAME = { IQD: 'دينار', USD: 'دولار' };
+function ppmOf(r) {
+  const p = Number(r.price), s = Number(r.size);
+  return p > 0 && s > 0 && isFinite(p) && isFinite(s) ? p / s : null;
+}
+const fmtPpm = (v, cur) => Math.round(v).toLocaleString('en-US') + ' ' + (CUR_NAME[cur] || CUR_NAME.IQD) + ' للمتر';
+// فهرس المتوسطات: منطقة|نوع|عملة => { sum, n } — يُبنى مرة لكل رسم للقائمة
+let ppmIndex = new Map();
+const ppmKey = (area, type, cur) => `${area || ''}|${type || ''}|${cur || 'IQD'}`;
+function buildPpmIndex() {
+  ppmIndex = new Map();
+  db.records.forEach((r) => {
+    const v = ppmOf(r);
+    if (v === null || !r.area) return;
+    const k = ppmKey(r.area, r.type, r.currency);
+    const o = ppmIndex.get(k) || { sum: 0, n: 0 };
+    o.sum += v; o.n++;
+    ppmIndex.set(k, o);
+  });
+}
+// مقارنة عقار بمتوسط نفس المنطقة والنوع والعملة (دون احتساب العقار نفسه)؛ تحتاج عقارين للمقارنة على الأقل
+function ppmCompare(r) {
+  const v = ppmOf(r);
+  if (v === null) return null;
+  const cur = r.currency || 'IQD';
+  let sum = 0, n = 0;
+  const o = r.area ? ppmIndex.get(ppmKey(r.area, r.type, cur)) : null;
+  if (o) {
+    sum = o.sum; n = o.n;
+    const self = r.id && db.records.find((x) => x.id === r.id);
+    if (self && ppmOf(self) !== null && self.area === r.area && (self.type || '') === (r.type || '') && (self.currency || 'IQD') === cur) { sum -= ppmOf(self); n--; }
+  }
+  const out = { v, cur, text: fmtPpm(v, cur), n };
+  if (n >= 2) { out.avg = sum / n; out.pct = Math.round((v / out.avg - 1) * 100); }
+  return out;
+}
+function ppmBadge(c) {
+  if (!c || c.pct === undefined) return '';
+  if (c.pct === 0) return ' <em class="cmp same">مثل المتوسط</em>';
+  return ` <em class="cmp ${c.pct > 0 ? 'up' : 'down'}">${c.pct > 0 ? '▲ أعلى' : '▼ أقل'} ${Math.abs(c.pct)}% من متوسط المنطقة</em>`;
+}
 const badge = (r) => (r.status ? `<span class="badge ${STATUS_CLASS[r.status] || ''}">${esc(r.status)}</span>` : '');
 
 // ---------- الموقع ----------
@@ -469,6 +512,7 @@ function resetForm() {
   $('#f-type').value = '';
   $('#f-landType').value = '';
   toggleHouseFields();
+  updatePpmHint();
   $('#f-photo').value = '';
   currentPhotos = [];
   renderGallery();
@@ -488,6 +532,7 @@ function editRecord(id) {
   $('#f-type').value = r.type || '';
   $('#f-landType').value = r.landType || '';
   toggleHouseFields();
+  updatePpmHint();
   currentPhotos = photosOf(r).slice();
   renderGallery();
   $('#formTitle').textContent = 'تعديل العقار';
@@ -628,6 +673,7 @@ function card(r) {
     r.baths && `<span>الحمامات: <b>${esc(r.baths)}</b></span>`,
     r.floors && `<span>الطوابق: <b>${esc(r.floors)}</b></span>`,
     r.price && `<span>السعر: <b>${esc(fmtPrice(r))}</b></span>`,
+    ppmCompare(r) && `<span>سعر المتر: <b>${esc(ppmCompare(r).text)}</b>${ppmBadge(ppmCompare(r))}</span>`,
     r.phone && `<span>الجوال: <b>${esc(r.phone)}</b></span>`
   ]
     .filter(Boolean)
@@ -705,6 +751,7 @@ let moreObs;
 
 const CLOSED_STATUSES = ['مباع', 'مؤجر'];
 function renderList() {
+  buildPpmIndex();
   const q = toLatin($('#search').value).trim().toLowerCase();
   const af = $('#areaFilter').value;
   const sf = $('#statusFilter').value;
@@ -873,6 +920,7 @@ function sheetHTML() {
       ${row('عدد الحمامات', r.baths)}
       ${row('عدد الطوابق', r.floors)}
       ${row('السعر', fmtPrice(r))}
+      ${row('سعر المتر', ppmOf(r) !== null ? fmtPpm(ppmOf(r), r.currency) : '')}
       ${row('الحالة', r.status)}
       ${r.location ? `<tr><th>الموقع</th><td class="sh-url">${esc(mapUrl(r.location))}</td></tr>` : ''}
       ${row('ملاحظات', r.notes)}
@@ -905,6 +953,35 @@ $('#btnDoPrint').addEventListener('click', async () => {
   if (res && !res.success && res.reason && res.reason !== 'cancelled') toast('تعذّرت الطباعة: ' + res.reason);
 });
 
+// ---------- سعر المتر في النموذج (حساب مباشر أثناء الكتابة) ----------
+function updatePpmHint() {
+  const el = $('#f-ppm');
+  if (!el) return;
+  const cur = {
+    id: $('#f-id').value,
+    area: cleanArea($('#f-area').value),
+    type: $('#f-type').value,
+    currency: $('#f-currency').value,
+    price: toLatin($('#f-price').value).replace(/[^\d.]/g, ''),
+    size: toLatin($('#f-size').value)
+  };
+  buildPpmIndex();
+  const c = ppmCompare(cur);
+  if (!c) { el.textContent = 'أدخل السعر والمساحة ليظهر سعر المتر تلقائياً'; el.className = 'hint'; return; }
+  let t = 'سعر المتر: ' + c.text;
+  let cls = 'hint ppm-ok';
+  if (c.pct !== undefined) {
+    t += c.pct === 0 ? ' — مثل متوسط المنطقة' : ` — ${c.pct > 0 ? 'أعلى' : 'أقل'} بـ ${Math.abs(c.pct)}% من متوسط المنطقة (${fmtPpm(c.avg, c.cur)}، من ${c.n} عقارات)`;
+    cls += c.pct > 0 ? ' up' : c.pct < 0 ? ' down' : '';
+  } else if (cur.area) t += ' — لا توجد عقارات كافية للمقارنة في هذه المنطقة والنوع';
+  el.textContent = t;
+  el.className = cls;
+}
+['#f-price', '#f-size', '#f-area', '#f-currency', '#f-type'].forEach((s) => {
+  $(s).addEventListener('input', updatePpmHint);
+  $(s).addEventListener('change', updatePpmHint);
+});
+
 // ---------- الإحصائيات والتصدير ----------
 const byName = (a, b) => (a.area === NO_AREA ? 1 : b.area === NO_AREA ? -1 : a.area.localeCompare(b.area, 'ar'));
 const STATS_SORTS = {
@@ -913,6 +990,7 @@ const STATS_SORTS = {
   sold: (a, b) => b.sold - a.sold || byName(a, b),
   ratio: (a, b) => (b.ratio ?? -1) - (a.ratio ?? -1) || b.total - a.total || byName(a, b)
 };
+let statsType = ''; // نوع العقار المستخدم في متوسط سعر المتر فقط
 let statsSort = 'name'; // الترتيب المعروض هو نفسه ترتيب ملفَي Excel وPDF
 
 const ratioOf = (sold, total) => (total ? sold / total : null);
@@ -920,8 +998,9 @@ const pctOf = (ratio) => (ratio === null ? null : Math.round(ratio * 100));
 
 function computeStats() {
   const map = new Map();
+  const allPpm = {};
   const get = (k) => {
-    if (!map.has(k)) map.set(k, { area: k, total: 0, sold: 0, by: {} });
+    if (!map.has(k)) map.set(k, { area: k, total: 0, sold: 0, by: {}, ppm: {} });
     return map.get(k);
   };
   (db.areas || []).forEach((a) => get(a)); // المنطقة المحفوظة تظهر حتى لو كانت فارغة
@@ -929,6 +1008,14 @@ function computeStats() {
     const o = get(r.area || NO_AREA);
     o.total++;
     if (r.status === SOLD) o.sold++;
+    const pv = !statsType || r.type === statsType ? ppmOf(r) : null;
+    if (pv !== null) {
+      const c = r.currency || 'IQD';
+      const a = o.ppm[c] || (o.ppm[c] = { sum: 0, n: 0 });
+      a.sum += pv; a.n++;
+      const g = allPpm[c] || (allPpm[c] = { sum: 0, n: 0 });
+      g.sum += pv; g.n++;
+    }
     const sk = SEGMENT_KEYS.has(r.status) ? r.status : ''; // حالة فارغة أو غير معروفة → «غير محدد»
     o.by[sk] = (o.by[sk] || 0) + 1;
   });
@@ -940,7 +1027,7 @@ function computeStats() {
   const ratio = ratioOf(sold, total);
   const by = {};
   rows.forEach((r) => Object.entries(r.by).forEach(([k, n]) => { by[k] = (by[k] || 0) + n; }));
-  return { rows, total, sold, ratio, pct: pctOf(ratio), by };
+  return { rows, total, sold, ratio, pct: pctOf(ratio), by, ppm: allPpm };
 }
 
 // أعمدة الجدول: المفتاح يُستخدم في الترتيب (عمود dist للعرض فقط)
@@ -949,6 +1036,7 @@ const STATS_COLS = [
   { key: 'total', label: 'عدد العقارات' },
   { key: 'sold', label: 'المباع' },
   { key: 'ratio', label: 'نسبة المباع' },
+  { key: 'ppm', label: 'متوسط سعر المتر' },
   { key: 'dist', label: 'توزيع الحالات' }
 ];
 
@@ -975,6 +1063,21 @@ function segBar(o, lg) {
 const legendHTML = (st) =>
   `<ul class="legend">${SEGMENTS.filter((g) => st.by[g.key]).map((g) => `<li><i class="dot ${g.cls}"></i>${segLabel(g)} <b>${st.by[g.key]}</b></li>`).join('')}</ul>`;
 
+// متوسط سعر المتر لكل عملة، مع مقارنته بالمتوسط العام (all) عند توفره
+function ppmCell(o, all, plain) {
+  const cur = Object.keys(o.ppm || {}).filter((c) => o.ppm[c].n);
+  if (!cur.length) return '<td class="ppm"><span class="none">—</span></td>';
+  const lines = cur.map((c) => {
+    const a = o.ppm[c], avg = a.sum / a.n;
+    let cmp = '';
+    if (all && all[c] && all[c].n > a.n) {
+      const pct = Math.round((avg / (all[c].sum / all[c].n) - 1) * 100);
+      if (pct !== 0) cmp = ` <em class="cmp ${pct > 0 ? 'up' : 'down'}" dir="ltr" title="مقارنة بالمتوسط العام">${pct > 0 ? '▲' : '▼'} ${Math.abs(pct)}%</em>`;
+    }
+    return `<div>${esc(fmtPpm(avg, c))}${plain ? '' : ` <small class="n">(${a.n})</small>`}${cmp}</div>`;
+  });
+  return `<td class="ppm">${lines.join('')}</td>`;
+}
 const pctCell = (o) => `<td class="pct">${o.pct === null ? '<span class="none">—</span>' : o.pct + '%'}</td>`;
 const distCell = (o) => `<td class="dist">${segBar(o)}</td>`;
 
@@ -985,6 +1088,7 @@ function renderStats() {
     const on = c.key === statsSort;
     const sort = on ? (c.key === 'name' ? 'ascending' : 'descending') : 'none';
     if (c.key === 'dist') return `<th class="dist">${c.label}</th>`;
+    if (c.key === 'ppm') return `<th class="ppm">${c.label}</th>`;
     return `<th aria-sort="${sort}"><button type="button" class="th-sort${on ? ' on' : ''}" data-sort="${c.key}" title="ترتيب حسب ${c.label}">${c.label}</button></th>`;
   };
   const summary = st.total
@@ -997,11 +1101,13 @@ function renderStats() {
   $('#statsBox').innerHTML = st.rows.length
     ? `${summary}<table class="stats">
         <thead><tr>${STATS_COLS.map(th).join('')}</tr></thead>
-        <tbody>${st.rows.map((r) => `<tr><td>${esc(r.area)}</td>${cell(r.total)}${cell(r.sold)}${pctCell(r)}${distCell(r)}</tr>`).join('')}</tbody>
-        <tfoot><tr><td>الإجمالي</td><td>${st.total}</td><td>${st.sold}</td>${pctCell(st)}${distCell(st)}</tr></tfoot>
+        <tbody>${st.rows.map((r) => `<tr><td>${esc(r.area)}</td>${cell(r.total)}${cell(r.sold)}${pctCell(r)}${ppmCell(r, st.ppm)}${distCell(r)}</tr>`).join('')}</tbody>
+        <tfoot><tr><td>الإجمالي</td><td>${st.total}</td><td>${st.sold}</td>${pctCell(st)}${ppmCell(st, null)}${distCell(st)}</tr></tfoot>
       </table>`
     : '<div class="empty">لا توجد عقارات بعد.</div>';
 }
+$('#statsType').innerHTML = '<option value="">كل الأنواع</option>' + TYPES.map((x) => `<option>${x}</option>`).join('');
+$('#statsType').addEventListener('change', (e) => { statsType = e.target.value; renderStats(); });
 $('#statsBox').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-sort]');
   if (!b) return;
@@ -1012,12 +1118,13 @@ $('#statsBox').addEventListener('click', (e) => {
 function statsSheetHTML(st) {
   const date = new Date().toLocaleDateString('ar-u-ca-gregory-nu-latn');
   const th = (c) => `<th${c.key === 'dist' ? ' class="dist"' : ''}>${c.label}</th>`;
+  const typeNote = statsType ? ` — متوسط سعر المتر لنوع: ${esc(statsType)}` : '';
   const line = st.total ? `<div class="sh-sum">مباع <b>${st.sold}</b> من <b>${st.total}</b> عقار (${st.pct}%)</div>${legendHTML(st)}` : '';
-  return `${sheetHead('إحصائيات المناطق')}${line}
+  return `${sheetHead('إحصائيات المناطق' + typeNote)}${line}
     <table class="sh-stats">
       <thead><tr>${STATS_COLS.map(th).join('')}</tr></thead>
-      <tbody>${st.rows.map((r) => `<tr><td>${esc(r.area)}</td><td>${r.total}</td><td>${r.sold}</td>${pctCell(r)}${distCell(r)}</tr>`).join('')}
-        <tr class="total"><td>الإجمالي</td><td>${st.total}</td><td>${st.sold}</td>${pctCell(st)}${distCell(st)}</tr></tbody>
+      <tbody>${st.rows.map((r) => `<tr><td>${esc(r.area)}</td><td>${r.total}</td><td>${r.sold}</td>${pctCell(r)}${ppmCell(r, st.ppm, true)}${distCell(r)}</tr>`).join('')}
+        <tr class="total"><td>الإجمالي</td><td>${st.total}</td><td>${st.sold}</td>${pctCell(st)}${ppmCell(st, null, true)}${distCell(st)}</tr></tbody>
     </table>
     <div class="sh-foot">${date}</div>`;
 }
@@ -1033,6 +1140,16 @@ function exportResult(res) {
   toast(res.ok ? 'تم حفظ الملف' : 'تعذّر الحفظ' + (res.error ? ': ' + res.error : ''));
 }
 
+// أعمدة Excel لمتوسط سعر المتر: عمود لكل عملة موجودة بياناتها
+function ppmExtra(st) {
+  const curs = Object.keys(st.ppm).filter((c) => st.ppm[c].n);
+  const avgOf = (o, c) => (o && o[c] && o[c].n ? Math.round(o[c].sum / o[c].n) : '');
+  return {
+    headers: curs.map((c) => `متوسط سعر المتر (${CUR_NAME[c] || c})`),
+    rows: st.rows.map((r) => curs.map((c) => avgOf(r.ppm, c))),
+    totals: curs.map((c) => avgOf(st.ppm, c))
+  };
+}
 $('#btnStatsXlsx').addEventListener('click', async () => {
   const st = computeStats();
   if (!st.rows.length) return toast('لا توجد بيانات للتصدير');
@@ -1041,7 +1158,8 @@ $('#btnStatsXlsx').addEventListener('click', async () => {
     headers: STATS_COLS.slice(0, 3).map((c) => c.label),
     rows: st.rows.map((r) => [r.area, r.total, r.sold]),
     totalLabel: 'الإجمالي',
-    ratio: { header: STATS_COLS[3].label, num: 2, den: 1 }
+    ratio: { header: STATS_COLS[3].label, num: 2, den: 1 },
+    extra: ppmExtra(st)
   });
   exportResult(await window.api.saveXlsx(bytes, `إحصائيات-العقارات-${todayStr()}.xlsx`));
 });
@@ -1084,7 +1202,11 @@ async function restoreFromText(text) {
       toast(limitMsg());
       return showTab('activate');
     }
-    if (!confirm('سيتم استبدال البيانات الحالية بهذه النسخة. متابعة؟')) return;
+    if (!confirm('سيتم استبدال البيانات الحالية بهذه النسخة. متابعة؟\n(تُحفظ نسخة أمان من بياناتك الحالية أولاً)')) return;
+    if (typeof window.api.backupNow === 'function') {
+      const s = await window.api.backupNow();
+      if (s && !s.ok && !confirm('تعذّر إنشاء نسخة أمان من البيانات الحالية. المتابعة بدونها؟')) return;
+    }
     db = { records: data.records, areas: data.areas || [], settings: Object.assign({}, db.settings, upgradeSettings(data.settings) || {}) };
     db.records.forEach((r) => dirtyPhotos.add(r.id));
     refreshAreas();
@@ -1134,6 +1256,11 @@ $('#b-choose').addEventListener('click', async () => {
   if (!dir) return;
   await window.api.backupSetConfig({ dir });
   await persist({ forceBackup: true }); // إنشاء نسخة فورية في المجلد الجديد
+  refreshBackups();
+});
+$('#b-now').addEventListener('click', async () => {
+  const s = await window.api.backupNow();
+  toast(s && s.ok ? 'تم إنشاء نسخة احتياطية الآن' : 'تعذّر إنشاء النسخة — تحقق من المجلد');
   refreshBackups();
 });
 $('#b-open').addEventListener('click', () => window.api.backupOpenDir());

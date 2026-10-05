@@ -138,24 +138,29 @@
    * مع شريط بيانات:  { header, num: رقم العمود (من 0), den: رقم العمود }
    *   { sheetName, headers: [..], rows: [[نص, رقم, رقم], ..], totalLabel, widths: [..], ratio }
    */
-  function xlsxFromTable({ sheetName, headers, rows, totalLabel, widths, ratio }) {
+  function xlsxFromTable({ sheetName, headers, rows, totalLabel, widths, ratio, extra }) {
     const nCols = headers.length;
-    const outCols = nCols + (ratio ? 1 : 0);
+    const nExtra = extra && extra.headers.length ? extra.headers.length : 0;
+    const ratioCol = nCols + (ratio ? 1 : 0); // أول عمود إضافي بعد عمود النسبة
+    const outCols = ratioCol + nExtra;
     const last = rows.length + 1; // آخر صف بيانات (الصف 1 هو العناوين)
     const lastCol = colName(outCols - 1);
-    const allHeaders = ratio ? [...headers, ratio.header] : headers;
+    const allHeaders = [...headers, ...(ratio ? [ratio.header] : []), ...(nExtra ? extra.headers : [])];
     const N = ratio ? colName(ratio.num) : '';
     const D = ratio ? colName(ratio.den) : '';
     // بدون عقارات لا توجد نسبة: تبقى الخلية فارغة (نص فارغ) بدل 0%
     const ratioCell = (r, numV, denV, style) =>
       `<c r="${colName(nCols)}${r}" s="${style}"${denV ? '' : ' t="str"'}><f>IF(${D}${r}=0,"",${N}${r}/${D}${r})</f><v>${denV ? numV / denV : ''}</v></c>`;
 
+    const extraCells = (vals, r, style) =>
+      nExtra ? vals.map((v, j) => (v === '' ? `<c r="${colName(ratioCol + j)}${r}" s="${style}" t="str"><v></v></c>` : numCell(colName(ratioCol + j) + r, v, style))).join('') : '';
+
     const sheetRows = [];
     sheetRows.push(`<row r="1" ht="24" customHeight="1">${allHeaders.map((h, c) => strCell(colName(c) + 1, h, S_HEAD)).join('')}</row>`);
     rows.forEach((row, i) => {
       const r = i + 2;
       const cells = row.map((v, c) => (c === 0 ? strCell(colName(c) + r, v, S_TEXT) : numCell(colName(c) + r, v, S_NUM))).join('');
-      sheetRows.push(`<row r="${r}">${cells}${ratio ? ratioCell(r, Number(row[ratio.num]) || 0, Number(row[ratio.den]) || 0, S_PCT) : ''}</row>`);
+      sheetRows.push(`<row r="${r}">${cells}${ratio ? ratioCell(r, Number(row[ratio.num]) || 0, Number(row[ratio.den]) || 0, S_PCT) : ''}${extraCells(extra && extra.rows[i], r, S_NUM)}</row>`);
     });
     if (totalLabel && rows.length) {
       const r = last + 1;
@@ -167,6 +172,7 @@
         cells += `<c r="${L}${r}" s="${S_TOTAL_NUM}"><f>SUM(${L}2:${L}${last})</f><v>${sums[c]}</v></c>`;
       }
       if (ratio) cells += ratioCell(r, sums[ratio.num], sums[ratio.den], S_TOTAL_PCT);
+      if (nExtra) cells += extra.totals.map((v, j) => (v === '' ? '' : `<c r="${colName(ratioCol + j)}${r}" s="${S_TOTAL_NUM}"><v>${v}</v></c>`)).join('');
       sheetRows.push(`<row r="${r}">${cells}</row>`);
     }
 
@@ -175,8 +181,9 @@
       .join('');
 
     // شريط بيانات أصلي في Excel على عمود النسبة (من 0% إلى 100%)
+    const ratioL = colName(nCols);
     const bar = ratio && rows.length
-      ? `<conditionalFormatting sqref="${lastCol}2:${lastCol}${last}"><cfRule type="dataBar" priority="1"><dataBar><cfvo type="num" val="0"/><cfvo type="num" val="1"/><color rgb="FF0F5C63"/></dataBar></cfRule></conditionalFormatting>`
+      ? `<conditionalFormatting sqref="${ratioL}2:${ratioL}${last}"><cfRule type="dataBar" priority="1"><dataBar><cfvo type="num" val="0"/><cfvo type="num" val="1"/><color rgb="FF0F5C63"/></dataBar></cfRule></conditionalFormatting>`
       : '';
 
     const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>

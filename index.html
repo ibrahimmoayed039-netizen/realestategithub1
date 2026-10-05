@@ -89,15 +89,22 @@
         <form id="recForm" class="form" autocomplete="off">
           <h2 id="formTitle">إضافة عقار جديد</h2>
           <input type="hidden" id="f-id">
-          <div class="grid">
-            <label>اسم العميل
+          <fieldset class="sec ">
+            <legend><span class="sec-ico">1</span>بيانات العميل</legend>
+            <div class="grid">
+            <label>اسم العميل<b class="req">*</b>
               <input id="f-clientName" required>
             </label>
             <label>رقم الجوال
-              <input id="f-phone" inputmode="tel" placeholder="مثال: 07xxxxxxxxx (يُضاف +964 تلقائياً)">
+              <input id="f-phone" inputmode="tel" placeholder="07xxxxxxxxx" title="يُضاف +964 تلقائياً">
             </label>
+            </div>
+          </fieldset>
+          <fieldset class="sec ">
+            <legend><span class="sec-ico">2</span>نوع العقار وموقعه</legend>
+            <div class="grid">
             <label>المنطقة
-              <input id="f-area" list="areaList" placeholder="اختر منطقة محفوظة أو اكتب منطقة جديدة">
+              <input id="f-area" list="areaList" placeholder="اختر أو اكتب منطقة">
               <datalist id="areaList"></datalist>
             </label>
             <label>رقم المقاطعة
@@ -109,6 +116,11 @@
             <label class="land-only" hidden>نوع القطعة
               <select id="f-landType"></select>
             </label>
+            </div>
+          </fieldset>
+          <fieldset class="sec ">
+            <legend><span class="sec-ico">3</span>المساحة والأبعاد</legend>
+            <div class="grid">
             <label>مساحة <span class="type-noun">العقار</span> (م²)
               <input id="f-size" inputmode="decimal">
             </label>
@@ -127,6 +139,11 @@
             <label>اتجاه واجهة <span class="type-noun">العقار</span>
               <select id="f-facade"></select>
             </label>
+            </div>
+          </fieldset>
+          <fieldset class="sec house-sec">
+            <legend><span class="sec-ico">4</span>تفاصيل البناء</legend>
+            <div class="grid">
             <label>سنة البناء
               <input id="f-year" inputmode="numeric" maxlength="4" placeholder="مثال: 2015">
             </label>
@@ -139,10 +156,15 @@
             <label class="house-only">عدد الطوابق
               <input id="f-floors" inputmode="numeric">
             </label>
+            </div>
+          </fieldset>
+          <fieldset class="sec ">
+            <legend><span class="sec-ico">5</span>السعر والحالة</legend>
+            <div class="grid">
             <label>الحالة
               <select id="f-status"></select>
             </label>
-            <label>السعر
+            <label class="span2">السعر
               <span class="row">
                 <input id="f-price" inputmode="decimal" placeholder="مثال: 150000">
                 <select id="f-currency" class="cur">
@@ -150,7 +172,13 @@
                   <option value="USD">دولار</option>
                 </select>
               </span>
+              <small class="hint" id="f-ppm"></small>
             </label>
+            </div>
+          </fieldset>
+          <fieldset class="sec ">
+            <legend><span class="sec-ico">6</span>الخريطة والملاحظات</legend>
+            <div class="grid">
             <label class="wide">الموقع (رابط خرائط قوقل أو إحداثيات)
               <span class="row">
                 <input id="f-location" placeholder="https://maps.google.com/... أو 24.7136,46.6753">
@@ -160,6 +188,11 @@
             <label class="wide">ملاحظات
               <textarea id="f-notes" rows="3"></textarea>
             </label>
+            </div>
+          </fieldset>
+          <fieldset class="sec ">
+            <legend><span class="sec-ico">7</span>الصور</legend>
+            <div class="grid">
             <div class="wide">
               <div class="photo-head">
                 <span>صور <span class="type-noun">العقار</span></span>
@@ -170,7 +203,8 @@
               </div>
               <div class="gallery" id="gallery"></div>
             </div>
-          </div>
+            </div>
+          </fieldset>
           <div class="actions">
             <button type="submit" class="btn primary">حفظ</button>
             <button type="button" class="btn ghost" id="btnCancelForm">إلغاء</button>
@@ -189,6 +223,10 @@
             </div>
           </div>
           <p class="hint">عدد العقارات في كل منطقة، وكم منها بحالة «مباع».</p>
+          <label class="ppm-type">نوع العقار في متوسط سعر المتر
+            <select id="statsType"></select>
+          </label>
+          <p class="hint">متوسط سعر المتر = السعر ÷ المساحة للعقارات التي أُدخل لها الاثنان، ويُحسب لكل عملة على حدة. الرقم بين القوسين هو عدد العقارات المحتسبة، والسهم يقارن المنطقة بالمتوسط العام. يُفضّل اختيار نوع واحد (مثل أرض) لأن سعر متر الأرض يختلف كثيراً عن البيت.</p>
           <div id="statsBox"></div>
         </div>
       </section>
@@ -249,13 +287,14 @@
                 <input id="b-dir" readonly>
                 <button type="button" class="btn ghost" id="b-choose">تغيير المجلد</button>
                 <button type="button" class="btn ghost" id="b-open">فتح المجلد</button>
+                <button type="button" class="btn primary" id="b-now">نسخة الآن</button>
               </span>
             </label>
-            <label>عدد النسخ المحفوظة
+            <label>عدد النسخ الأخيرة
               <input id="b-keep" type="number" min="5" max="200">
             </label>
           </div>
-          <p class="hint">يُفضّل اختيار مجلد على فلاشة أو قرص خارجي أو مجلد مزامنة (OneDrive / Google Drive) حتى تبقى بياناتك سالمة لو تعطّل الجهاز. عند تجاوز العدد تُحذف الأقدم تلقائياً.</p>
+          <p class="hint">يُفضّل اختيار مجلد على فلاشة أو قرص خارجي أو مجلد مزامنة (OneDrive / Google Drive) حتى تبقى بياناتك سالمة لو تعطّل الجهاز. يُحتفظ بآخر عدد من النسخ، إضافةً إلى نسخة واحدة من كل يوم لآخر 30 يوماً، وتُحذف الأقدم تلقائياً. وتُحفظ نسخة أمان تلقائياً قبل أي استعادة.</p>
           <table class="blist"><tbody id="b-list"></tbody></table>
         </div>
         <div class="card-box">

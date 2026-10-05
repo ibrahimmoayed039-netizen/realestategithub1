@@ -123,6 +123,7 @@ function saveCfg(b) {
 const backupDir = (cfg) => (cfg || loadCfg()).dir || path.join(app.getPath('userData'), 'backups');
 const BACKUP_NAME = /^backup-[\d_-]+\.json$/;
 let lastHash = '';
+const DAILY_KEEP_DAYS = 30;
 
 async function autoBackup(json) {
   const cfg = loadCfg();
@@ -136,9 +137,15 @@ async function autoBackup(json) {
   const name = `backup-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}-${p(d.getMilliseconds(), 3)}.json`;
   await fs.promises.writeFile(path.join(dir, name), json, 'utf8');
   lastHash = hash;
-  // الاحتفاظ بآخر N نسخة فقط
+  // الاحتفاظ بآخر N نسخة، + نسخة واحدة (الأحدث) من كل يوم لآخر 30 يوماً
   const files = (await fs.promises.readdir(dir)).filter((f) => BACKUP_NAME.test(f)).sort().reverse();
-  for (const f of files.slice(cfg.keep)) await fs.promises.unlink(path.join(dir, f)).catch(() => {});
+  const keepSet = new Set(files.slice(0, cfg.keep));
+  const days = new Set();
+  for (const f of files) {
+    const day = f.slice(7, 17); // YYYY-MM-DD
+    if (!days.has(day) && days.size < DAILY_KEEP_DAYS) { days.add(day); keepSet.add(f); }
+  }
+  for (const f of files) if (!keepSet.has(f)) await fs.promises.unlink(path.join(dir, f)).catch(() => {});
 }
 
 // النسخ الاحتياطي الكامل (مع الصور) لا يُنشأ عند كل حفظ حتى لا يثقل البرنامج:
@@ -201,6 +208,12 @@ ipcMain.handle('db:save', async (_e, data) => {
   return { ok: true, backupError: lastBackupError };
 });
 
+// إنشاء نسخة فوراً وانتظار اكتمالها (تُستعمل قبل الاستعادة كنسخة أمان)
+ipcMain.handle('backup:now', async () => {
+  clearTimeout(backupTimer);
+  await runBackup();
+  return { ok: !lastBackupError, error: lastBackupError };
+});
 ipcMain.handle('backup:config:get', () => {
   const cfg = loadCfg();
   return { enabled: cfg.enabled, dir: backupDir(cfg), keep: cfg.keep };
@@ -398,7 +411,7 @@ ipcMain.handle('export:pdf', async (_e, html, name) => {
 ipcMain.handle('backup:export', async (_e, json) => {
   const r = await dialog.showSaveDialog(win, {
     title: 'حفظ نسخة احتياطية',
-    defaultPath: 'نسخة-العقارات.json',
+    defaultPath: `نسخة-العقارات-${new Date().toISOString().slice(0, 10)}.json`,
     filters: [{ name: 'JSON', extensions: ['json'] }]
   });
   if (r.canceled || !r.filePath) return false;

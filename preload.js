@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('api', {
   backupGetConfig: () => ipcRenderer.invoke('backup:config:get'),
   backupSetConfig: (patch) => ipcRenderer.invoke('backup:config:set', patch),
   backupChooseDir: () => ipcRenderer.invoke('backup:chooseDir'),
+  backupNow: () => ipcRenderer.invoke('backup:now'),
   backupList: () => ipcRenderer.invoke('backup:list'),
   backupRestore: (name) => ipcRenderer.invoke('backup:restore', name),
   backupOpenDir: () => ipcRenderer.invoke('backup:openDir')

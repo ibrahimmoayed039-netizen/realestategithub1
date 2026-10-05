@@ -95,8 +95,8 @@ main { flex: 1; overflow: auto; padding: 24px; background: linear-gradient(180de
   border-bottom: 2px solid var(--brass);
 }
 .cur { width: 110px; flex: none; }
-label.check { flex-direction: row; align-items: center; gap: 8px; }
-label.check input { width: auto; }
+label.check { display: flex; flex-direction: row; align-items: center; gap: 8px; }
+label.check input { width: auto; margin-top: 0; display: inline-block; }
 .blist { width: 100%; border-collapse: collapse; margin-top: 12px; }
 .blist td { padding: 7px 8px; border-bottom: 1px solid var(--line); }
 .blist td:last-child { text-align: left; }
@@ -274,7 +274,11 @@ label.check input { width: auto; }
 .btn.danger:hover { border-color: var(--danger); }
 .btn.small { padding: 5px 10px; font-size: 13px; }
 
-label { display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: 14px; }
+label { display: block; font-weight: 600; font-size: 14px; line-height: 1.35; }
+/* العنوان يبقى في سطر واحد متصل، والحقل تحته */
+label > input, label > select, label > textarea, label > .row { display: flex; margin-top: 5px; }
+label > input, label > select, label > textarea { display: block; }
+label > .hint, label > small { display: block; }
 input, select, textarea {
   font: inherit;
   font-weight: 400;
@@ -300,7 +304,7 @@ textarea { resize: vertical; }
   box-shadow: var(--hi), var(--e2);
 }
 h2 { margin: 0 0 18px; font-size: 20px; }
-.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px 20px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px 16px; }
 .wide { grid-column: 1 / -1; }
 .actions { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
 
@@ -389,6 +393,24 @@ h2 { margin: 0 0 18px; font-size: 20px; }
   .item-actions { grid-column: 1 / -1; justify-content: flex-start; max-width: none; }
 }
 
+/* ---------- نموذج الإضافة: أقسام مرتبة ---------- */
+#recForm { max-width: 980px; margin-inline: auto; padding: 22px 26px 0; }
+#recForm > h2 { padding-bottom: 14px; border-bottom: 2px solid var(--brass); display: inline-block; }
+.sec { border: 1px solid var(--line); border-radius: 12px; margin: 0 0 16px; padding: 16px 18px 18px; background: #fbfcfd; min-width: 0; }
+.sec legend { display: flex; align-items: center; gap: 8px; padding: 0 8px; font-weight: 700; font-size: 15px; color: var(--petrol-dark); }
+.sec-ico { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--petrol); color: #fff; font-size: 12px; font-weight: 700; }
+.sec label { color: #24363e; font-size: 13.5px; }
+.sec input::placeholder, .sec textarea::placeholder { color: #9aabb3; font-size: 13px; }
+.sec input:focus, .sec select:focus, .sec textarea:focus { outline: none; border-color: var(--petrol); box-shadow: 0 0 0 3px rgba(15, 92, 99, .15); }
+.req { color: var(--danger); margin-inline-start: 3px; }
+#recForm .btn { white-space: nowrap; }
+.sec .grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); align-items: start; }
+.sec .grid > label.check { align-self: center; padding: 10px 12px; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
+.sec .grid > label.wide, .sec .grid > div.wide { grid-column: 1 / -1; }
+#recForm .actions { position: sticky; bottom: 0; z-index: 3; margin: 0 -26px; padding: 12px 26px; background: rgba(255, 255, 255, .96); border-top: 1px solid var(--line); border-radius: 0 0 12px 12px; backdrop-filter: blur(4px); }
+#recForm .actions .btn { min-width: 110px; }
+@media (max-width: 900px) { #recForm { padding: 16px 14px 0; } #recForm .actions { margin: 0 -14px; padding: 10px 14px; } }
+
 /* ---------- الطباعة الفعلية: تظهر الورقة فقط ---------- */
 @media print {
   html, body { background: #fff; height: auto; }
@@ -471,3 +493,20 @@ h2 { margin: 0 0 18px; font-size: 20px; }
 
 .hide-sold { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--muted); white-space: nowrap; cursor: pointer; user-select: none; }
 .hide-sold input { cursor: pointer; }
+
+/* ---------- سعر المتر ---------- */
+.cmp { font-style: normal; font-size: 12px; font-weight: 700; padding: 1px 7px; border-radius: 10px; white-space: nowrap; }
+.cmp.up { color: #8a5a00; background: #fbefd2; }
+.cmp.down { color: #1b6b3a; background: #dff2e5; }
+.cmp.same { color: var(--muted); background: #eef2f4; }
+.ppm-ok { color: var(--petrol-dark); font-weight: 600; }
+.ppm-ok.up { color: #8a5a00; }
+.ppm-ok.down { color: #1b6b3a; }
+.stats td.ppm, .stats th.ppm { width: 210px; font-size: 13.5px; }
+.stats td.ppm .n { color: var(--muted); }
+.ppm-type { display: block; max-width: 280px; margin: 8px 0 4px; }
+.sheet .sh-stats td.ppm, .sheet .sh-stats th.ppm { width: 17%; }
+
+.sec .grid > label.span2 { grid-column: span 2; }
+.ppm-ok, #f-ppm { font-size: 13px; line-height: 1.5; }
+@media (max-width: 560px) { .sec .grid > label.span2 { grid-column: 1 / -1; } }
