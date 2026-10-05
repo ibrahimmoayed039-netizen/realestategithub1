@@ -10,7 +10,7 @@
   <div class="app" id="app">
     <header class="top">
       <div class="brand">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="3 2 38 37" class="brand-mark" aria-hidden="true" focusable="false"><polygon points="6,30 14,34 14,12 6,8" fill="#cda255"/><polygon points="14,34 22,30 22,8 14,12" fill="#a87d30"/><polygon points="6,8 14,12 22,8 14,4" fill="#f6e2b0"/><polyline points="6,24.5 14,28.5 22,24.5" fill="none" stroke="rgba(255,255,255,.45)" stroke-width=".8" stroke-linecap="round"/><polyline points="6,19 14,23 22,19" fill="none" stroke="rgba(255,255,255,.45)" stroke-width=".8" stroke-linecap="round"/><polyline points="6,13.5 14,17.5 22,13.5" fill="none" stroke="rgba(255,255,255,.45)" stroke-width=".8" stroke-linecap="round"/><polygon points="22,32 30,36 30,27 22,23" fill="#d6e7e9"/><polygon points="30,36 38,32 38,23 30,27" fill="#a6c8cc"/><polygon points="22,23 30,27 38,23 30,19" fill="#ffffff"/><polyline points="22,27.5 30,31.5 38,27.5" fill="none" stroke="rgba(15,92,99,.25)" stroke-width=".8" stroke-linecap="round"/></svg>
+        <img src="build/brand.png" class="brand-mark" alt="" aria-hidden="true">
         <span id="brandName">إدارة العقارات</span>
       </div>
       <nav class="tabs">
@@ -19,7 +19,6 @@
         <button class="tab" data-tab="stats">الإحصائيات</button>
         <button class="tab" data-tab="print">الطباعة</button>
         <button class="tab" data-tab="settings">الإعدادات</button>
-        <button class="tab" data-tab="activate">التفعيل</button>
         <button class="tab" data-tab="about">حول البرنامج</button>
       </nav>
       <button type="button" class="lic-badge" id="licBadge" hidden></button>
@@ -174,6 +173,9 @@
               </span>
               <small class="hint" id="f-ppm"></small>
             </label>
+            <label class="wide">المبلغ كتابةً (يظهر تلقائياً)
+              <input id="f-priceWords" class="words-field" readonly tabindex="-1" placeholder="اكتب السعر بالأرقام وسيظهر هنا بالحروف">
+            </label>
             </div>
           </fieldset>
           <fieldset class="sec ">
@@ -305,11 +307,7 @@
             <button class="btn ghost" id="btnImport">استيراد نسخة احتياطية</button>
           </div>
         </div>
-      </section>
-      <!-- تبويب: حول البرنامج -->
-      <!-- تبويب: التفعيل -->
-      <section class="panel" id="tab-activate">
-        <div class="card-box activate">
+              <div class="card-box activate" id="licBox">
           <h2>تفعيل البرنامج</h2>
           <div class="lic-state" id="licState"></div>
           <dl class="about-list">
@@ -330,7 +328,7 @@
           <p class="hint" id="licTrialNote"></p>
         </div>
       </section>
-
+      <!-- تبويب: حول البرنامج -->
       <section class="panel" id="tab-about">
         <div class="card-box about">
           <h2>حول البرنامج</h2>

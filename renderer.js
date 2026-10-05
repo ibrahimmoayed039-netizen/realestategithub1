@@ -98,10 +98,13 @@ function toast(msg) {
 
 // ---------- التبويبات ----------
 function showTab(name) {
-  if (licLocked && name !== 'activate') name = 'activate';
+  let toLicense = name === 'activate'; // التفعيل أصبح قسماً داخل الإعدادات
+  if (toLicense) name = 'settings';
+  if (licLocked && name !== 'settings') { name = 'settings'; toLicense = true; }
   if (name === 'form' && !$('#f-id').value && !canAdd()) {
     toast(limitMsg());
-    name = 'activate';
+    name = 'settings';
+    toLicense = true;
   }
   $$('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
   $$('.panel').forEach((p) => p.classList.toggle('active', p.id === 'tab-' + name));
@@ -109,7 +112,10 @@ function showTab(name) {
   if (name === 'stats') renderStats();
   if (name === 'print' || name === 'settings') refreshAreas();
   if (name === 'settings') refreshBackups();
-  if (name === 'activate') fillActivate();
+  if (name === 'settings') {
+    fillActivate();
+    if (toLicense) $('#licBox').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 }
 $$('.tab').forEach((t) => t.addEventListener('click', () => showTab(t.dataset.tab)));
 $('#btnAboutWa').addEventListener('click', () => window.api.openExternal('https://wa.me/9647736970504'));
@@ -122,6 +128,65 @@ function fmtPrice(r) {
   const n = Number(r.price);
   if (!r.price || !isFinite(n)) return '';
   return n.toLocaleString('en-US') + ' ' + (r.currency === 'USD' ? 'دولار' : 'دينار');
+}
+
+// ---------- كتابة المبلغ بالحروف ----------
+const AR_ONES = ['', 'واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة'];
+const AR_TEENS = ['عشرة', 'أحد عشر', 'اثنا عشر', 'ثلاثة عشر', 'أربعة عشر', 'خمسة عشر', 'ستة عشر', 'سبعة عشر', 'ثمانية عشر', 'تسعة عشر'];
+const AR_TENS = ['', '', 'عشرون', 'ثلاثون', 'أربعون', 'خمسون', 'ستون', 'سبعون', 'ثمانون', 'تسعون'];
+const AR_HUNDREDS = ['', 'مائة', 'مائتان', 'ثلاثمائة', 'أربعمائة', 'خمسمائة', 'ستمائة', 'سبعمائة', 'ثمانمائة', 'تسعمائة'];
+// المقياس: [المفرد، المثنى، الجمع]
+const AR_SCALES = [null, ['ألف', 'ألفان', 'آلاف'], ['مليون', 'مليونان', 'ملايين'], ['مليار', 'ملياران', 'مليارات'], ['تريليون', 'تريليونان', 'تريليونات']];
+function arGroup(n) { // 1..999
+  const parts = [];
+  const h = Math.floor(n / 100), rest = n % 100;
+  if (h) parts.push(AR_HUNDREDS[h]);
+  if (rest) {
+    if (rest < 10) parts.push(AR_ONES[rest]);
+    else if (rest < 20) parts.push(AR_TEENS[rest - 10]);
+    else {
+      const o = rest % 10;
+      parts.push(o ? AR_ONES[o] + ' و' + AR_TENS[Math.floor(rest / 10)] : AR_TENS[Math.floor(rest / 10)]);
+    }
+  }
+  return parts.join(' و');
+}
+function numToArWords(num) {
+  let n = Math.floor(Number(num));
+  if (!isFinite(n) || n <= 0) return n === 0 ? 'صفر' : '';
+  if (n >= 1e15) return '';
+  const groups = [];
+  for (let i = 0; n > 0; i++, n = Math.floor(n / 1000)) groups.push(n % 1000);
+  const out = [];
+  for (let i = groups.length - 1; i >= 0; i--) {
+    const g = groups[i];
+    if (!g) continue;
+    if (i === 0) { out.push(arGroup(g)); continue; }
+    const sc = AR_SCALES[i];
+    if (g === 1) out.push(sc[0]);
+    else if (g === 2) out.push(sc[1]);
+    else if (g <= 10) out.push(arGroup(g) + ' ' + sc[2]);
+    else out.push(arGroup(g) + ' ' + sc[0]);
+  }
+  return out.join(' و');
+}
+// اسم العملة بحسب العدد: 1 مفرد، 2 مثنى، 3-10 جمع، 11-99 تمييز منصوب، 100+ مفرد
+const AR_CUR = { IQD: ['دينار', 'ديناران', 'دنانير', 'ديناراً'], USD: ['دولار', 'دولاران', 'دولارات', 'دولاراً'] };
+function priceWords(r) {
+  const p = Number(r.price);
+  if (!r.price || !isFinite(p) || p < 1) return '';
+  const w = numToArWords(p);
+  if (!w) return '';
+  const n = Math.floor(p);
+  const c = AR_CUR[r.currency === 'USD' ? 'USD' : 'IQD'];
+  const usd = r.currency === 'USD';
+  const adj = usd ? ['أمريكي', 'أمريكيان', 'أمريكية', 'أمريكياً'] : ['عراقي', 'عراقيان', 'عراقية', 'عراقياً'];
+  const tail = 'فقط لا غير';
+  if (n === 1) return `${c[0]} ${adj[0]} واحد ${tail}`;
+  if (n === 2) return `${c[1]} ${adj[1]} ${tail}`;
+  if (n <= 10) return `${w} ${c[2]} ${adj[2]} ${tail}`;
+  if (n < 100) return `${w} ${c[3]} ${adj[3]} ${tail}`;
+  return `${w} ${c[0]} ${adj[0]} ${tail}`;
 }
 
 // ---------- سعر المتر ----------
@@ -166,6 +231,14 @@ function ppmBadge(c) {
   if (c.pct === 0) return ' <em class="cmp same">مثل المتوسط</em>';
   return ` <em class="cmp ${c.pct > 0 ? 'up' : 'down'}">${c.pct > 0 ? '▲ أعلى' : '▼ أقل'} ${Math.abs(c.pct)}% من متوسط المنطقة</em>`;
 }
+// قائمة منسدلة بشكل شارة لتغيير الحالة مباشرة من بطاقة العقار
+const statusPicker = (r) => {
+  const cur = STATUSES.includes(r.status) ? r.status : '';
+  return `<select class="badge st-pick ${STATUS_CLASS[cur] || ''}" data-status-id="${r.id}" title="تغيير الحالة" aria-label="تغيير حالة العقار">`
+    + (cur ? '' : '<option value="" selected>— الحالة —</option>')
+    + STATUSES.map((s) => `<option${s === cur ? ' selected' : ''}>${s}</option>`).join('')
+    + '</select>';
+};
 const badge = (r) => (r.status ? `<span class="badge ${STATUS_CLASS[r.status] || ''}">${esc(r.status)}</span>` : '');
 
 // ---------- الموقع ----------
@@ -348,12 +421,12 @@ function fillActivate() {
 function applyLicense() {
   if (!lic) return;
   licLocked = lic.state === 'expired';
-  $$('.tab').forEach((t) => (t.hidden = licLocked && t.dataset.tab !== 'activate'));
+  $$('.tab').forEach((t) => (t.hidden = licLocked && t.dataset.tab !== 'settings'));
   renderLicBadge();
   if (licLocked) {
     $$('.modal').forEach((m) => (m.hidden = true));
     showTab('activate');
-  } else if ($('#tab-activate').classList.contains('active')) {
+  } else if ($('#tab-settings').classList.contains('active')) {
     fillActivate();
   }
 }
@@ -680,7 +753,7 @@ function card(r) {
     .join('');
   return `<article class="item">
     ${thumb}
-    <div><h3>${esc(r.clientName)}${badge(r)}</h3><div class="meta">${meta}</div></div>
+    <div><h3>${esc(r.clientName)}${statusPicker(r)}</h3><div class="meta">${meta}</div></div>
     <div class="item-actions">
       <button class="btn wa small" data-a="wa" data-id="${r.id}">واتساب</button>
       ${r.location ? `<button class="btn ghost small" data-a="map" data-id="${r.id}">الموقع</button>` : ''}
@@ -853,6 +926,20 @@ $('#list').addEventListener('click', async (e) => {
   }
 });
 
+// تغيير الحالة السريع (مثلاً عند بيع العقار) دون فتح نموذج التعديل
+$('#list').addEventListener('change', async (e) => {
+  const s = e.target.closest('select[data-status-id]');
+  if (!s) return;
+  const r = db.records.find((x) => x.id === s.dataset.statusId);
+  if (!r || !s.value || s.value === r.status) return;
+  const old = r.status;
+  r.status = s.value;
+  await persist();
+  renderList();
+  const hidden = $('#hideSold').checked && CLOSED_STATUSES.includes(r.status) && !$('#statusFilter').value;
+  toast(`تم تغيير حالة «${r.clientName}» من ${old || 'غير محدد'} إلى ${r.status}` + (hidden ? ' — أصبح مخفياً (ألغِ «إخفاء المباع والمؤجَّر» لإظهاره)' : ''));
+});
+
 // ---------- الطباعة والمعاينة ----------
 function fillPrintSelect() {
   $('#printRecord').innerHTML = db.records.length
@@ -920,6 +1007,7 @@ function sheetHTML() {
       ${row('عدد الحمامات', r.baths)}
       ${row('عدد الطوابق', r.floors)}
       ${row('السعر', fmtPrice(r))}
+      ${row('السعر كتابةً', priceWords(r))}
       ${row('سعر المتر', ppmOf(r) !== null ? fmtPpm(ppmOf(r), r.currency) : '')}
       ${row('الحالة', r.status)}
       ${r.location ? `<tr><th>الموقع</th><td class="sh-url">${esc(mapUrl(r.location))}</td></tr>` : ''}
@@ -957,6 +1045,10 @@ $('#btnDoPrint').addEventListener('click', async () => {
 function updatePpmHint() {
   const el = $('#f-ppm');
   if (!el) return;
+  const wEl = $('#f-priceWords');
+  if (wEl) {
+    wEl.value = priceWords({ price: toLatin($('#f-price').value).replace(/[^\d.]/g, ''), currency: $('#f-currency').value });
+  }
   const cur = {
     id: $('#f-id').value,
     area: cleanArea($('#f-area').value),
