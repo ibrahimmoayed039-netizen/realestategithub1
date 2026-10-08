@@ -141,8 +141,10 @@
             </div>
           </fieldset>
           <fieldset class="sec house-sec">
-            <legend><span class="sec-ico">4</span>تفاصيل البناء</legend>
-            <div class="grid">
+            <legend><span class="sec-ico">4</span>تفاصيل البناء
+              <label class="chk bld-toggle"><input type="checkbox" id="f-bldToggle" checked> إظهار</label>
+            </legend>
+            <div class="grid" id="bld-body">
             <label>سنة البناء
               <input id="f-year" inputmode="numeric" maxlength="4" placeholder="مثال: 2015">
             </label>
@@ -349,6 +351,9 @@
   <div class="modal" id="waModal" hidden>
     <div class="modal-box">
       <h3>إرسال عبر واتساب</h3>
+      <label class="chk">
+        <input type="checkbox" id="wa-hide"> إخفاء اسم العميل ورقم هاتفه (للإرسال إلى زبون آخر)
+      </label>
       <label>رقم الجوال
         <input id="wa-phone" inputmode="tel">
       </label>
@@ -381,6 +386,15 @@
           <option value="58">إيصال حراري 58 مم</option>
         </select>
       </label>
+      <label>تصميم الوصل
+        <select id="sheetTheme">
+          <option value="classic">مجسّم أزرق</option>
+          <option value="luxury">فاخر (أسود وذهبي)</option>
+          <option value="modern">عصري بسيط (أخضر)</option>
+          <option value="formal">رسمي بإطار مزدوج</option>
+        </select>
+      </label>
+      <label class="chk"><input type="checkbox" id="pv-hide"> إخفاء اسم العميل والجوال</label>
       <button class="btn primary" id="btnDoPrint">طباعة</button>
       <button class="btn ghost" id="btnClosePreview">إغلاق</button>
     </div>

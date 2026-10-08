@@ -520,3 +520,207 @@ select.st-pick:focus { outline: none; box-shadow: 0 0 0 3px rgba(15, 92, 99, .3)
 select.st-pick option { color: #1b2a31; background: #fff; }
 
 .words-field { background: #f4f8f9 !important; color: var(--petrol-dark); font-weight: 700; cursor: default; }
+
+/* خيار الإخفاء */
+label.chk{display:flex;flex-direction:row;align-items:center;gap:8px;cursor:pointer;font-weight:600}
+label.chk input{width:auto;margin:0}
+
+.bld-toggle{display:inline-flex;margin-inline-start:12px;font-size:.85em;font-weight:500}
+#bld-body[hidden]{display:none}
+
+
+/* ================= تصميم الوصل الاحترافي (مجسّم) ================= */
+.sheet { -webkit-print-color-adjust: exact; print-color-adjust: exact; font-family: inherit; }
+.sheet.a4 { background: linear-gradient(180deg,#fff 0,#f7f9fc 100%); }
+.sheet .sh-head {
+  background: linear-gradient(135deg,#0f2a4a 0%,#1d4e89 55%,#2a6fb8 100%);
+  color: #fff; border: 0; border-radius: 14px 14px 0 0;
+  padding: 16px 18px 12px; margin: 0;
+  box-shadow: 0 6px 14px rgba(15,42,74,.35), inset 0 1px 0 rgba(255,255,255,.25);
+  text-shadow: 0 1px 2px rgba(0,0,0,.35);
+}
+.sheet .sh-office { font-size: 1.7em; letter-spacing: .3px; }
+.sheet .sh-title {
+  display: block; width: fit-content; margin: -2px auto 14px; padding: 5px 26px;
+  background: linear-gradient(180deg,#f6c453,#d9a021); color: #3a2a00;
+  border-radius: 0 0 14px 14px; font-size: 1.05em;
+  box-shadow: 0 4px 8px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.6);
+}
+.sheet .sh-photo {
+  border-radius: 12px; border: 3px solid #fff;
+  box-shadow: 0 8px 18px rgba(0,0,0,.28);
+}
+.sheet .sh-gallery img {
+  border-radius: 8px; border: 2px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,.22);
+}
+.sh-price {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  margin: 14px 0 10px; padding: 12px 16px; border-radius: 14px;
+  background: linear-gradient(145deg,#ffffff,#e6edf7);
+  border: 1px solid #c9d6e8; border-right: 6px solid #1d4e89;
+  box-shadow: 6px 6px 14px rgba(15,42,74,.18), -4px -4px 10px rgba(255,255,255,.9);
+}
+.sh-price small { display: block; color: #5b6b82; font-size: .8em; }
+.sh-price strong { display: block; font-size: 1.7em; color: #0f2a4a; line-height: 1.2; }
+.sh-price em { display: block; font-style: normal; color: #44546b; font-size: .85em; margin-top: 2px; }
+.sh-price-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.sh-badge {
+  background: linear-gradient(180deg,#2fb36a,#1e8a4e); color: #fff; font-weight: 700;
+  padding: 4px 16px; border-radius: 20px;
+  box-shadow: 0 3px 6px rgba(30,138,78,.4), inset 0 1px 0 rgba(255,255,255,.4);
+}
+.sh-ppm { font-size: .8em; color: #44546b; }
+.sh-sec-title {
+  margin: 14px 0 8px; font-weight: 700; color: #0f2a4a; font-size: 1em;
+  padding-right: 10px; border-right: 4px solid #d9a021;
+}
+.sh-tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 8px; }
+.sh-tile {
+  background: linear-gradient(145deg,#ffffff,#eef2f8);
+  border: 1px solid #d3deed; border-radius: 10px; padding: 7px 12px;
+  box-shadow: 3px 3px 7px rgba(15,42,74,.14), -2px -2px 6px rgba(255,255,255,.95);
+  break-inside: avoid;
+}
+.sh-tile span { display: block; font-size: .78em; color: #5b6b82; }
+.sh-tile b { display: block; color: #111; font-size: 1.02em; word-break: break-word; }
+.sh-tile.wide { grid-column: 1 / -1; }
+.sh-tile.ltr b { direction: ltr; text-align: right; }
+.sheet .sh-foot {
+  margin-top: 16px; padding-top: 8px; border-top: 2px dashed #b9c6da; color: #5b6b82;
+}
+
+/* جداول القوائم والإحصائيات */
+.sheet table { border-collapse: separate; border-spacing: 0; border-radius: 10px; overflow: hidden;
+  box-shadow: 0 5px 14px rgba(15,42,74,.18); }
+.sheet th, .sheet td { border: 0; border-bottom: 1px solid #dde5f0; }
+.sheet thead th { background: linear-gradient(180deg,#1d4e89,#0f2a4a); color: #fff; }
+.sheet tbody tr:nth-child(even) td { background: #f1f5fb; }
+.sheet .sh-stats tr.total td { background: #fbe9b7; }
+
+/* الورق الحراري: تصميم نظيف بدون ظلال/تدرجات (أبيض وأسود) */
+.sheet.w80, .sheet.w58 { background: #fff; }
+.sheet.w80 .sh-head, .sheet.w58 .sh-head { background: #000; color: #fff; border-radius: 6px; box-shadow: none; text-shadow: none; padding: 6px; }
+.sheet.w80 .sh-title, .sheet.w58 .sh-title { background: #fff; color: #000; box-shadow: none; border: 1.5px solid #000; border-radius: 12px; margin: 6px auto; padding: 2px 12px; }
+.sheet.w80 .sh-photo, .sheet.w58 .sh-photo, .sheet.w80 .sh-gallery img, .sheet.w58 .sh-gallery img { box-shadow: none; border: 1px solid #000; }
+.sheet.w80 .sh-price, .sheet.w58 .sh-price { background: #fff; box-shadow: none; border: 2px solid #000; border-radius: 8px; padding: 6px; }
+.sheet.w80 .sh-price strong, .sheet.w58 .sh-price strong { font-size: 1.3em; color: #000; }
+.sheet.w80 .sh-badge, .sheet.w58 .sh-badge { background: #000; box-shadow: none; padding: 1px 10px; }
+.sheet.w80 .sh-tiles, .sheet.w58 .sh-tiles { grid-template-columns: 1fr; gap: 3px; }
+.sheet.w80 .sh-tile, .sheet.w58 .sh-tile { background: #fff; box-shadow: none; border: 1px solid #000; border-radius: 4px; padding: 2px 6px; display: flex; justify-content: space-between; gap: 6px; }
+.sheet.w80 .sh-tile span, .sheet.w58 .sh-tile span { color: #000; }
+.sheet.w80 .sh-sec-title, .sheet.w58 .sh-sec-title { border-right-color: #000; }
+.sheet.w80 table, .sheet.w58 table { box-shadow: none; border-radius: 0; }
+.sheet.w80 th, .sheet.w58 th, .sheet.w80 td, .sheet.w58 td { border: 1px solid #000; }
+.sheet.w80 thead th, .sheet.w58 thead th { background: #000; }
+.sheet.w80 tbody tr:nth-child(even) td, .sheet.w58 tbody tr:nth-child(even) td { background: #fff; }
+
+@media print {
+  body.printing .sheet.a4 { background: #fff; }
+}
+
+
+/* ================= قوالب تصميم الوصل (A4) ================= */
+/* --- فاخر: أسود وذهبي --- */
+.sheet.a4.th-luxury { background: #fff; }
+.sheet.a4.th-luxury .sh-head { background: linear-gradient(135deg,#0b0b0b,#2a2a2a); color: #e8c46a; border-radius: 0; border-bottom: 4px solid #c9a227; box-shadow: 0 6px 14px rgba(0,0,0,.4); text-shadow: none; }
+.sheet.a4.th-luxury .sh-office { letter-spacing: 1px; }
+.sheet.a4.th-luxury .sh-title { background: #c9a227; color: #111; border-radius: 0 0 6px 6px; box-shadow: 0 3px 6px rgba(0,0,0,.3); }
+.sheet.a4.th-luxury .sh-photo, .sheet.a4.th-luxury .sh-gallery img { border: 2px solid #c9a227; border-radius: 4px; }
+.sheet.a4.th-luxury .sh-price { background: linear-gradient(145deg,#161616,#2b2b2b); border: 1px solid #c9a227; border-right: 6px solid #c9a227; box-shadow: 0 8px 16px rgba(0,0,0,.35); }
+.sheet.a4.th-luxury .sh-price small, .sheet.a4.th-luxury .sh-price em, .sheet.a4.th-luxury .sh-ppm { color: #d9c88f; }
+.sheet.a4.th-luxury .sh-price strong { color: #f1d37a; }
+.sheet.a4.th-luxury .sh-badge { background: linear-gradient(180deg,#e8c46a,#b8921f); color: #111; box-shadow: none; }
+.sheet.a4.th-luxury .sh-sec-title { color: #111; border-right-color: #c9a227; }
+.sheet.a4.th-luxury .sh-tile { background: #fff; border: 1px solid #c9a227; border-radius: 4px; box-shadow: 2px 2px 0 rgba(201,162,39,.35); }
+.sheet.a4.th-luxury thead th { background: #111; color: #e8c46a; }
+.sheet.a4.th-luxury tbody tr:nth-child(even) td { background: #faf5e4; }
+.sheet.a4.th-luxury .sh-foot { border-top-color: #c9a227; }
+
+/* --- عصري بسيط: أخضر --- */
+.sheet.a4.th-modern { background: #fff; }
+.sheet.a4.th-modern .sh-head { background: #fff; color: #0d5c46; border-radius: 0; border-bottom: 3px solid #0d5c46; box-shadow: none; text-shadow: none; text-align: right; display: flex; justify-content: space-between; align-items: center; padding: 6px 0 12px; }
+.sheet.a4.th-modern .sh-office { font-size: 1.9em; }
+.sheet.a4.th-modern .sh-title { background: none; color: #0d5c46; box-shadow: none; margin: 12px 0; padding: 0; font-size: 1.3em; text-align: right; width: auto; }
+.sheet.a4.th-modern .sh-photo, .sheet.a4.th-modern .sh-gallery img { border: 0; border-radius: 10px; box-shadow: none; }
+.sheet.a4.th-modern .sh-price { background: #0d5c46; border: 0; border-radius: 12px; box-shadow: none; }
+.sheet.a4.th-modern .sh-price small, .sheet.a4.th-modern .sh-price em, .sheet.a4.th-modern .sh-ppm { color: #bfe6d8; }
+.sheet.a4.th-modern .sh-price strong { color: #fff; }
+.sheet.a4.th-modern .sh-badge { background: #fff; color: #0d5c46; box-shadow: none; }
+.sheet.a4.th-modern .sh-sec-title { color: #0d5c46; border-right-color: #0d5c46; }
+.sheet.a4.th-modern .sh-tile { background: #f3f7f5; border: 0; border-radius: 8px; box-shadow: none; }
+.sheet.a4.th-modern table { box-shadow: none; border: 1px solid #d5e3dd; }
+.sheet.a4.th-modern thead th { background: #0d5c46; }
+.sheet.a4.th-modern tbody tr:nth-child(even) td { background: #f3f7f5; }
+.sheet.a4.th-modern .sh-foot { border-top: 1px solid #d5e3dd; }
+
+/* --- رسمي: إطار مزدوج أسود --- */
+.sheet.a4.th-formal { background: #fff; font-family: "Traditional Arabic", "Amiri", "Times New Roman", serif; font-size: 15px; outline: 3px double #000; outline-offset: -8mm; }
+.sheet.a4.th-formal .sh-head { background: none; color: #000; border-radius: 0; border-bottom: 2px solid #000; box-shadow: none; text-shadow: none; }
+.sheet.a4.th-formal .sh-title { background: none; color: #000; box-shadow: none; border: 2px solid #000; border-radius: 0; margin: 12px auto; }
+.sheet.a4.th-formal .sh-photo, .sheet.a4.th-formal .sh-gallery img { border: 1px solid #000; border-radius: 0; box-shadow: none; }
+.sheet.a4.th-formal .sh-price { background: #fff; border: 3px double #000; border-radius: 0; box-shadow: none; }
+.sheet.a4.th-formal .sh-price strong { color: #000; }
+.sheet.a4.th-formal .sh-price small, .sheet.a4.th-formal .sh-price em, .sheet.a4.th-formal .sh-ppm { color: #222; }
+.sheet.a4.th-formal .sh-badge { background: #000; box-shadow: none; border-radius: 0; }
+.sheet.a4.th-formal .sh-sec-title { color: #000; border-right-color: #000; }
+.sheet.a4.th-formal .sh-tile { background: #fff; border: 1px solid #000; border-radius: 0; box-shadow: none; }
+.sheet.a4.th-formal .sh-tile span { color: #222; }
+.sheet.a4.th-formal table { box-shadow: none; border-radius: 0; }
+.sheet.a4.th-formal th, .sheet.a4.th-formal td { border: 1px solid #000; }
+.sheet.a4.th-formal thead th { background: #000; }
+.sheet.a4.th-formal tbody tr:nth-child(even) td { background: #fff; }
+.sheet.a4.th-formal .sh-foot { border-top: 2px solid #000; color: #000; }
+@media print { body.printing .sheet.a4.th-formal { outline: 3px double #000; outline-offset: -8mm; } }
+
+/* ================= تجسيم القوائم ================= */
+.list { gap: 14px; perspective: 1200px; }
+.item {
+  position: relative;
+  background: linear-gradient(160deg, #ffffff 0%, #f1f5f7 100%);
+  border: 1px solid #cfd9de;
+  border-inline-start: 6px solid var(--petrol);
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.95),
+    0 1px 0 #c5d1d7,
+    0 3px 0 #dbe4e8,
+    0 14px 24px -10px rgba(15,31,38,.35);
+  transition: transform .18s ease, box-shadow .2s ease;
+}
+.item:hover {
+  transform: translateY(-4px) rotateX(1.2deg);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.95),
+    0 1px 0 #b7c6cd,
+    0 4px 0 #d3dde2,
+    0 22px 34px -12px rgba(15,31,38,.45);
+}
+.item:active { transform: translateY(0); box-shadow: inset 0 2px 6px rgba(15,31,38,.15), 0 6px 12px -8px rgba(15,31,38,.35); }
+.item h3 { text-shadow: 0 1px 0 #fff; color: var(--petrol-deep); }
+.thumb {
+  border: 3px solid #fff; border-radius: 10px;
+  box-shadow: 0 6px 14px -4px rgba(15,31,38,.45), 0 0 0 1px rgba(15,31,38,.12);
+}
+.meta { gap: 8px; }
+.meta > span {
+  background: linear-gradient(180deg, #ffffff, #e9eff2);
+  border: 1px solid #d3dce1; border-radius: 8px; padding: 3px 10px;
+  box-shadow: inset 0 1px 0 #fff, 0 2px 3px -1px rgba(15,31,38,.18);
+}
+.item-actions .btn { box-shadow: var(--hi), 0 2px 0 #c3cfd5, 0 6px 10px -5px rgba(15,31,38,.35); }
+.item-actions .btn:active { transform: translateY(2px); box-shadow: inset 0 2px 4px rgba(15,31,38,.2); }
+
+/* بقية القوائم: المناطق والجداول والشرائح */
+.stats, .blist {
+  border-collapse: separate; border-spacing: 0 6px;
+}
+.stats tr, .blist tr { filter: drop-shadow(0 3px 4px rgba(15,31,38,.14)); }
+.stats td, .stats th, .blist td { background: linear-gradient(180deg,#fff,#f1f5f7); border-bottom: 0; }
+.stats tbody td:first-child, .blist td:first-child { border-radius: 0 10px 10px 0; }
+.stats tbody td:last-child, .blist td:last-child { border-radius: 10px 0 0 10px; }
+.chip {
+  background: linear-gradient(180deg,#fff,#e6edf0);
+  box-shadow: inset 0 1px 0 #fff, 0 3px 6px -2px rgba(15,31,38,.28);
+}
+@media (prefers-reduced-motion: reduce) { .item:hover { transform: none; } }

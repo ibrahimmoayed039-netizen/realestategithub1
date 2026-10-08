@@ -263,7 +263,7 @@ function normPhone(p) {
   return d;
 }
 
-function fillTemplate(r) {
+function fillTemplate(r, hideClient) {
   const map = {
     '{الاسم}': r.clientName,
     '{المنطقة}': r.area,
@@ -286,6 +286,8 @@ function fillTemplate(r) {
   let t = db.settings.tpl || DEFAULT_TPL;
   // السطر الذي يحوي {الشارع} أو {ركن} يُحذف كاملاً إن لم تكن له قيمة
   t = t.split('\n').filter((line) => !['{عرض_الواجهة}', '{الشارع}', '{ركن}'].some((k) => line.includes(k) && !map[k])).join('\n');
+  // إخفاء اسم العميل: يُحذف المتغير (مع المسافة قبله) من الرسالة
+  if (hideClient) t = t.split(' {الاسم}').join('').split('{الاسم}').join('');
   for (const k in map) t = t.split(k).join(map[k] || '-');
   return t.trim();
 }
@@ -307,6 +309,7 @@ function waDrag(e, idx) {
 
 function openWa(r) {
   waRec = r;
+  $('#wa-hide').checked = false;
   $('#wa-phone').value = r.phone || '';
   $('#wa-text').value = fillTemplate(r);
   const ph = photosOf(r);
@@ -325,6 +328,15 @@ function openWa(r) {
   }
   $('#waModal').hidden = false;
 }
+// إخفاء اسم العميل ورقمه عند الإرسال إلى زبون آخر
+$('#wa-hide').addEventListener('change', () => {
+  if (!waRec) return;
+  const hide = $('#wa-hide').checked;
+  $('#wa-text').value = fillTemplate(waRec, hide);
+  // رقم العميل يُفرَّغ ليكتب المستخدم رقم الزبون المراد الإرسال إليه
+  $('#wa-phone').value = hide ? '' : waRec.phone || '';
+  if (hide) $('#wa-phone').focus();
+});
 $('#wa-close').addEventListener('click', () => ($('#waModal').hidden = true));
 $('#wa-open').addEventListener('click', () => {
   const phone = normPhone($('#wa-phone').value);
@@ -543,6 +555,12 @@ function toggleHouseFields() {
 }
 $('#f-type').addEventListener('change', toggleHouseFields);
 
+// إخفاء/إظهار تفاصيل البناء اختيارياً (القيم المُدخلة تبقى محفوظة)
+function toggleBuildingBody() {
+  $('#bld-body').hidden = !$('#f-bldToggle').checked;
+}
+$('#f-bldToggle').addEventListener('change', toggleBuildingBody);
+
 function initFacades() {
   $('#a-facade').innerHTML = '<option value="">كل الواجهات</option>' + FACADES.map((f) => `<option>${f}</option>`).join('');
   $('#f-type').innerHTML = '<option value="">— اختر —</option>' + TYPES.map((x) => `<option>${x}</option>`).join('');
@@ -584,6 +602,8 @@ function resetForm() {
   $('#f-currency').value = 'IQD';
   $('#f-type').value = '';
   $('#f-landType').value = '';
+  $('#f-bldToggle').checked = true;
+  toggleBuildingBody();
   toggleHouseFields();
   updatePpmHint();
   $('#f-photo').value = '';
@@ -967,6 +987,7 @@ function sheetHead(title) {
 }
 
 function sheetHTML() {
+  const hide = $('#pv-hide') && $('#pv-hide').checked;
   const date = new Date().toLocaleDateString('ar-u-ca-gregory-nu-latn');
   if (preview.type === 'all') {
     const list = db.records
@@ -974,8 +995,8 @@ function sheetHTML() {
       .sort((a, b) => (a.area ? 0 : 1) - (b.area ? 0 : 1) || (a.area || '').localeCompare(b.area || '', 'ar'));
     const rows = list
       .map(
-        (r, i) => `<tr><td>${i + 1}</td><td>${esc(r.clientName)}</td><td>${esc(r.area)}</td><td>${esc(r.district)}</td><td>${esc(r.type)}${r.landType ? ' — ' + esc(r.landType) : ''}</td>
-          <td>${esc(r.size)}</td><td>${esc(r.facade)}</td><td>${esc(r.year)}</td><td>${esc(r.phone)}</td><td>${esc(fmtPrice(r))}</td><td>${esc(r.status)}</td></tr>`
+        (r, i) => `<tr><td>${i + 1}</td><td>${hide ? '' : esc(r.clientName)}</td><td>${esc(r.area)}</td><td>${esc(r.district)}</td><td>${esc(r.type)}${r.landType ? ' — ' + esc(r.landType) : ''}</td>
+          <td>${esc(r.size)}</td><td>${esc(r.facade)}</td><td>${esc(r.year)}</td><td>${hide ? '' : esc(r.phone)}</td><td>${esc(fmtPrice(r))}</td><td>${esc(r.status)}</td></tr>`
       )
       .join('');
     return `${sheetHead('قائمة العقارات' + (preview.ids ? ' (نتائج التصفية)' : preview.area ? ' — ' + esc(preview.area) : ''))}
@@ -985,41 +1006,51 @@ function sheetHTML() {
   }
   const r = db.records.find((x) => x.id === preview.id);
   if (!r) return '';
-  const row = (k, v) => (v ? `<tr><th>${k}</th><td>${esc(v)}</td></tr>` : '');
+  const tile = (k, v, cls) => (v ? `<div class="sh-tile ${cls || ''}"><span>${k}</span><b>${esc(v)}</b></div>` : '');
+  const photos = photosOf(r);
+  const ppm = ppmOf(r) !== null ? fmtPpm(ppmOf(r), r.currency) : '';
   return `${sheetHead('بطاقة عقار')}
-    ${photosOf(r)[0] ? `<img class="sh-photo" src="${photosOf(r)[0]}">` : ''}
-    ${photosOf(r).length > 1 ? `<div class="sh-gallery">${photosOf(r).slice(1).map((p) => `<img src="${p}">`).join('')}</div>` : ''}
-    <table><tbody>
-      ${row('العميل', r.clientName)}
-      ${row('الجوال', r.phone)}
-      ${row('نوع العقار', r.type)}
-      ${row('نوع القطعة', r.landType)}
-      ${row('المنطقة', r.area)}
-      ${row('رقم المقاطعة', r.district)}
-      ${row('المساحة', r.size ? r.size + ' م²' : '')}
-      ${row('النزال (العمق)', r.depth ? r.depth + ' م' : '')}
-      ${row('عرض الواجهة', r.facadeWidth ? r.facadeWidth + ' م' : '')}
-      ${row('الواجهة', r.facade)}
-      ${row('عرض الشارع', r.street ? r.street + ' م' : '')}
-      ${row('ركن', r.corner ? 'نعم' : '')}
-      ${row('سنة البناء', r.year)}
-      ${row('عدد الغرف', r.rooms)}
-      ${row('عدد الحمامات', r.baths)}
-      ${row('عدد الطوابق', r.floors)}
-      ${row('السعر', fmtPrice(r))}
-      ${row('السعر كتابةً', priceWords(r))}
-      ${row('سعر المتر', ppmOf(r) !== null ? fmtPpm(ppmOf(r), r.currency) : '')}
-      ${row('الحالة', r.status)}
-      ${r.location ? `<tr><th>الموقع</th><td class="sh-url">${esc(mapUrl(r.location))}</td></tr>` : ''}
-      ${row('ملاحظات', r.notes)}
-    </tbody></table>
+    ${photos[0] ? `<img class="sh-photo" src="${photos[0]}">` : ''}
+    ${photos.length > 1 ? `<div class="sh-gallery">${photos.slice(1).map((p) => `<img src="${p}">`).join('')}</div>` : ''}
+    <div class="sh-price">
+      <div class="sh-price-main">
+        <small>السعر</small>
+        <strong>${esc(fmtPrice(r)) || '-'}</strong>
+        ${priceWords(r) ? `<em>${esc(priceWords(r))}</em>` : ''}
+      </div>
+      <div class="sh-price-side">
+        ${r.status ? `<span class="sh-badge">${esc(r.status)}</span>` : ''}
+        ${ppm ? `<span class="sh-ppm">سعر المتر: ${esc(ppm)}</span>` : ''}
+      </div>
+    </div>
+    ${hide ? '' : `<div class="sh-sec-title">بيانات العميل</div><div class="sh-tiles">${tile('العميل', r.clientName)}${tile('الجوال', r.phone, 'ltr')}</div>`}
+    <div class="sh-sec-title">تفاصيل العقار</div>
+    <div class="sh-tiles">
+      ${tile('نوع العقار', r.type)}
+      ${tile('نوع القطعة', r.landType)}
+      ${tile('المنطقة', r.area)}
+      ${tile('رقم المقاطعة', r.district)}
+      ${tile('المساحة', r.size ? r.size + ' م²' : '')}
+      ${tile('النزال (العمق)', r.depth ? r.depth + ' م' : '')}
+      ${tile('عرض الواجهة', r.facadeWidth ? r.facadeWidth + ' م' : '')}
+      ${tile('الواجهة', r.facade)}
+      ${tile('عرض الشارع', r.street ? r.street + ' م' : '')}
+      ${tile('ركن', r.corner ? 'نعم' : '')}
+      ${tile('سنة البناء', r.year)}
+      ${tile('عدد الغرف', r.rooms)}
+      ${tile('عدد الحمامات', r.baths)}
+      ${tile('عدد الطوابق', r.floors)}
+    </div>
+    ${r.location ? `<div class="sh-tiles"><div class="sh-tile wide"><span>الموقع</span><b class="sh-url">${esc(mapUrl(r.location))}</b></div></div>` : ''}
+    ${r.notes ? `<div class="sh-tiles"><div class="sh-tile wide"><span>ملاحظات</span><b>${esc(r.notes)}</b></div></div>` : ''}
     <div class="sh-foot">${date}</div>`;
 }
 
 function renderSheet() {
   const size = $('#paperSize').value;
   const sheet = $('#sheet');
-  sheet.className = 'sheet ' + (size === 'a4' ? 'a4' : 'w' + size);
+  const theme = $('#sheetTheme').value;
+  sheet.className = 'sheet ' + (size === 'a4' ? 'a4 th-' + theme : 'w' + size);
   sheet.innerHTML = sheetHTML();
 }
 
@@ -1028,7 +1059,13 @@ function openPreview(type, id, area, ids) {
   renderSheet();
   $('#previewModal').hidden = false;
 }
+try { $('#sheetTheme').value = localStorage.getItem('sheetTheme') || 'classic'; } catch (e) {}
+$('#sheetTheme').addEventListener('change', () => {
+  try { localStorage.setItem('sheetTheme', $('#sheetTheme').value); } catch (e) {}
+  renderSheet();
+});
 $('#paperSize').addEventListener('change', renderSheet);
+$('#pv-hide').addEventListener('change', renderSheet);
 $('#btnClosePreview').addEventListener('click', () => ($('#previewModal').hidden = true));
 
 $('#btnDoPrint').addEventListener('click', async () => {
